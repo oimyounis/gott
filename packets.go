@@ -25,3 +25,9 @@ func GetFixedHeader(packetType byte) []byte {
 	}
 	return h
 }
+
+func MakeConnAckPacket(sessionPresent, returnCode byte) (packet []byte) {
+	packet = append(packet, GetFixedHeader(TYPE_CONNACK_BYTE)...)
+	packet = append(packet, sessionPresent, returnCode)
+	return
+}
