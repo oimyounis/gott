@@ -3,16 +3,23 @@ package gott
 import (
 	"log"
 	"net"
+	"sync"
+)
+
+var (
+	// 4 is MQTT v3.1.1
+	SUPPORTED_PROTOCOL_VERSIONS = []byte{4}
 )
 
 type Broker struct {
 	address  string
 	listener net.Listener
-	clients  []*Client
+	clients  map[string]*Client
+	mutex    sync.RWMutex
 }
 
 func NewBroker(address string) *Broker {
-	return &Broker{address: address, listener: nil}
+	return &Broker{address: address, listener: nil, clients: map[string]*Client{}}
 }
 
 func (b *Broker) Listen() error {
@@ -36,14 +43,28 @@ func (b *Broker) Listen() error {
 	return nil
 }
 
-func (b *Broker) addClient(conn net.Conn) *Client {
-	c := &Client{connection: conn, connected: true}
-	b.clients = append(b.clients, c)
-	return c
+func (b *Broker) addClient(clientId string, client *Client) {
+	b.mutex.RLock()
+	if c, ok := b.clients[clientId]; ok {
+		// disconnect existing client
+		c.closeConnection()
+	}
+	b.mutex.RUnlock()
+
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.clients[clientId] = client
+}
+
+func (b *Broker) removeClient(clientId string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	delete(b.clients, clientId)
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
-	log.Printf("Accepted connection from %v\n", conn.RemoteAddr().String())
-	client := b.addClient(conn)
-	go client.listen()
+	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
+	//client := b.addClient(conn)
+	c := &Client{connection: conn, connected: true, broker: b}
+	go c.listen()
 }
