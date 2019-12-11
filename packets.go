@@ -24,6 +24,16 @@ func ExtractConnectFlags(bits string) ConnectFlags {
 	}
 }
 
+func GetPacketType(b byte) byte {
+	bs := bytes.ByteToBinaryString(b)
+	packetTypeHalf := bs[:4]
+	packetType, err := bytes.BinaryStringToByte(packetTypeHalf)
+	if err != nil {
+		return 0
+	}
+	return packetType
+}
+
 func GetFixedHeader(packetType byte) []byte {
 	h := make([]byte, FIXED_HEADER_LEN)
 	h[0] = packetType
