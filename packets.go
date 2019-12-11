@@ -12,7 +12,7 @@ type ConnectFlags struct {
 	Reserved, CleanSession, WillFlag, WillQOS, WillRetain, PasswordFlag, UserNameFlag string
 }
 
-func CheckConnectFlags(bits string) ConnectFlags {
+func ExtractConnectFlags(bits string) ConnectFlags {
 	return ConnectFlags{
 		Reserved:     bits[7:],
 		CleanSession: bits[6:7],
