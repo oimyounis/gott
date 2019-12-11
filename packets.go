@@ -12,6 +12,10 @@ type ConnectFlags struct {
 	Reserved, CleanSession, WillFlag, WillQOS, WillRetain, PasswordFlag, UserNameFlag string
 }
 
+type PublishFlags struct {
+	DUP, QoS, Retain string
+}
+
 func ExtractConnectFlags(bits string) ConnectFlags {
 	return ConnectFlags{
 		Reserved:     bits[7:],
@@ -24,42 +28,36 @@ func ExtractConnectFlags(bits string) ConnectFlags {
 	}
 }
 
-func GetPacketType(b byte) byte {
+func ExtractPublishFlags(bits string) PublishFlags {
+	return PublishFlags{
+		DUP:    bits[0:1],
+		QoS:    bits[1:3],
+		Retain: bits[3:],
+	}
+}
+
+func ParseFixedHeaderFirstByte(b byte) (byte, string) {
 	bs := bytes.ByteToBinaryString(b)
-	packetTypeHalf := bs[:4]
-	packetType, err := bytes.BinaryStringToByte(packetTypeHalf)
+	packetType, err := bytes.BinaryStringToByte(bs[:4])
 	if err != nil {
-		return 0
+		return 0, ""
 	}
-	return packetType
+	return packetType, bs[4:]
 }
 
-func GetFixedHeader(packetType byte) []byte {
-	h := make([]byte, FIXED_HEADER_LEN)
-	h[0] = packetType
-
-	if packetType == TYPE_CONNACK_BYTE {
-		h[1] = 2 // constant remaining len as per [3.2.1]
-	}
-	return h
+func MakeConnAckPacket(sessionPresent, returnCode byte) []byte {
+	return []byte{TYPE_CONNACK_BYTE, CONNECT_REM_LEN, sessionPresent, returnCode}
 }
 
-func MakeConnAckPacket(sessionPresent, returnCode byte) (packet []byte) {
-	packet = append(packet, GetFixedHeader(TYPE_CONNACK_BYTE)...)
-	packet = append(packet, sessionPresent, returnCode) // variable header as per [3.2.2]
-	return
-}
-
+// Not completed yet
 func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
+	// TODO: complete the implementation of this func
 	if topic == nil {
 		return nil
 	}
 
-	fixedHeader := make([]byte, FIXED_HEADER_LEN)
-	byte1 := TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag
-
-	fixedHeader[0] = byte1
-	fixedHeader[1] = 0 // remaining length (var header len + payload len)
+	// 2nd byte = remaining length (var header len + payload len)
+	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag, 0}
 
 	varHeader := make([]byte, 2) // topic name + packet identifier
 	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
