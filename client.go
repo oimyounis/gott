@@ -159,6 +159,13 @@ func (c *Client) closeConnection() {
 	_ = c.connection.Close()
 }
 
+func (c *Client) publish(topicName, payload []byte, dup, qos, retain byte) {
+	if qos == 0 {
+		dup = 0
+	}
+	MakePublishPacket(topicName, payload, dup, qos, retain)
+}
+
 func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
