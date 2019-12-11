@@ -49,3 +49,27 @@ func MakeConnAckPacket(sessionPresent, returnCode byte) (packet []byte) {
 	packet = append(packet, sessionPresent, returnCode) // variable header as per [3.2.2]
 	return
 }
+
+func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
+	if topic == nil {
+		return nil
+	}
+
+	fixedHeader := make([]byte, FIXED_HEADER_LEN)
+	byte1 := TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag
+
+	fixedHeader[0] = byte1
+	fixedHeader[1] = 0 // remaining length (var header len + payload len)
+
+	varHeader := make([]byte, 2) // topic name + packet identifier
+	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
+	varHeader = append(varHeader, topic...)
+
+	if qos >= 1 {
+		varHeader = append(varHeader, 0, 0)
+		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], uint16(packetSeq.Next()))
+	}
+
+	log.Println(fixedHeader, "-", varHeader)
+	return
+}
