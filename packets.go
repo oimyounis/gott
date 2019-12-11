@@ -1,5 +1,13 @@
 package gott
 
+import (
+	"encoding/binary"
+	"gott/bytes"
+	"log"
+)
+
+var packetSeq *Sequencer = &Sequencer{UpperBoundBits: 16, Start: 1}
+
 type ConnectFlags struct {
 	Reserved, CleanSession, WillFlag, WillQOS, WillRetain, PasswordFlag, UserNameFlag string
 }
