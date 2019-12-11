@@ -39,13 +39,13 @@ func GetFixedHeader(packetType byte) []byte {
 	h[0] = packetType
 
 	if packetType == TYPE_CONNACK_BYTE {
-		h[1] = 2
+		h[1] = 2 // constant remaining len as per [3.2.1]
 	}
 	return h
 }
 
 func MakeConnAckPacket(sessionPresent, returnCode byte) (packet []byte) {
 	packet = append(packet, GetFixedHeader(TYPE_CONNACK_BYTE)...)
-	packet = append(packet, sessionPresent, returnCode)
+	packet = append(packet, sessionPresent, returnCode) // variable header as per [3.2.2]
 	return
 }
