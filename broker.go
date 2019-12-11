@@ -11,6 +11,8 @@ var (
 	SUPPORTED_PROTOCOL_VERSIONS = []byte{4}
 )
 
+var GOTT *Broker
+
 type Broker struct {
 	address  string
 	listener net.Listener
@@ -19,7 +21,8 @@ type Broker struct {
 }
 
 func NewBroker(address string) *Broker {
-	return &Broker{address: address, listener: nil, clients: map[string]*Client{}}
+	GOTT = &Broker{address: address, listener: nil, clients: map[string]*Client{}}
+	return GOTT
 }
 
 func (b *Broker) Listen() error {
@@ -43,17 +46,18 @@ func (b *Broker) Listen() error {
 	return nil
 }
 
-func (b *Broker) addClient(clientId string, client *Client) {
+func (b *Broker) addClient(client *Client) {
 	b.mutex.RLock()
-	if c, ok := b.clients[clientId]; ok {
+	if c, ok := b.clients[client.ClientId]; ok {
 		// disconnect existing client
+		log.Println("disconnecting existing client with id:", c.ClientId)
 		c.closeConnection()
 	}
 	b.mutex.RUnlock()
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	b.clients[clientId] = client
+	b.clients[client.ClientId] = client
 }
 
 func (b *Broker) removeClient(clientId string) {
@@ -65,6 +69,6 @@ func (b *Broker) removeClient(clientId string) {
 func (b *Broker) handleConnection(conn net.Conn) {
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 	//client := b.addClient(conn)
-	c := &Client{connection: conn, connected: true, broker: b}
+	c := &Client{connection: conn, connected: true}
 	go c.listen()
 }
