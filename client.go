@@ -171,12 +171,14 @@ loop:
 
 			topicEnd := 2 + topicLen
 			topic := string(remBytes[2:topicEnd])
-			packetId := -1
+			var packetId uint16
+			var packetIdBytes []byte
 
 			varHeaderEnd := topicEnd
 
 			if publishFlags.QoS != "00" { // QoS = 1 or 2
-				packetId = int(binary.BigEndian.Uint16(remBytes[topicEnd : 2+topicEnd]))
+				packetIdBytes = remBytes[topicEnd : 2+topicEnd]
+				packetId = binary.BigEndian.Uint16(packetIdBytes)
 				varHeaderEnd += 2
 			}
 
