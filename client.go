@@ -143,7 +143,7 @@ loop:
 			// connection succeeded
 			log.Println("client connected with id:", c.ClientId)
 			GOTT.addClient(c)
-			c.emit(MakeConnAckPacket(0, CONNECT_ACCEPTED))
+			c.emit(MakeConnAckPacket(0, CONNECT_ACCEPTED)) // TODO: fix sessionPresent after implementing sessions
 
 			go func(c *Client) {
 				time.Sleep(time.Second * 2)
