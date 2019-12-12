@@ -43,7 +43,7 @@ func (b *Broker) Listen() error {
 			go b.handleConnection(conn)
 		}
 	}
-	return nil
+	//return nil
 }
 
 func (b *Broker) addClient(client *Client) {
