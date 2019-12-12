@@ -184,13 +184,39 @@ loop:
 
 			payload := string(remBytes[varHeaderEnd:])
 
-			// TODO: implement publish acknowledgements [3.3.4]
+			log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
+
+			if publishFlags.QoS == "01" { // QoS level 1
+				// return a PUBACK
+				c.emit(MakePubAckPacket(packetIdBytes))
+			} else if publishFlags.QoS == "10" { // QoS level 2
+				// return a PUBREC
+				c.emit(MakePubRecPacket(packetIdBytes))
+			}
 			// TODO: implement topic filter
 			// TODO: implement re-publishing to other clients
 			// TODO: implement retention policy
-			log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
-		}
-	}
+		case TYPE_PUBACK:
+			break
+		case TYPE_PUBREC:
+			break
+		case TYPE_PUBREL:
+			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
+				log.Println("malformed PUBREL packet: flags bits != 0010")
+				break loop
+			}
+
+			packetIdBytes := make([]byte, PUBREL_REM_LEN)
+			if _, err = io.ReadFull(sockBuffer, packetIdBytes); err != nil {
+				log.Println("error reading var header", err)
+				break loop
+			}
+
+			//packetId := binary.BigEndian.Uint16(packetIdBytes)
+			//log.Println("PUBREL in", packetId)
+			c.emit(MakePubCompPacket(packetIdBytes))
+		case TYPE_PUBCOMP:
+			break
 	c.disconnect()
 }
 
