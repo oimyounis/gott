@@ -52,6 +52,29 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 	return filterList, nil
 }
 
+func ExtractUnSubTopicFilters(payload []byte) ([]Filter, error) {
+	filterList := make([]Filter, 0)
+	parsedBytes := 0
+	payloadLen := len(payload)
+
+	for parsedBytes < payloadLen {
+		lenBytesEnd := parsedBytes + 2
+		topicLen := int(binary.BigEndian.Uint16(payload[parsedBytes:lenBytesEnd]))
+		topicNameEnd := lenBytesEnd + topicLen
+		topicFilter := string(payload[lenBytesEnd:topicNameEnd])
+
+		filterList = append(filterList, Filter{Filter: topicFilter}) // this should retrieve topic filters from sub list
+
+		parsedBytes += topicLen + 2 // 2 bytes for topic length
+	}
+
+	if parsedBytes != payloadLen {
+		return nil, errors.New("invalid payload")
+	}
+
+	return filterList, nil
+}
+
 func ParseFixedHeaderFirstByte(b byte) (byte, string) {
 	bs := bytes.ByteToBinaryString(b)
 	packetType, err := bytes.BinaryStringToByte(bs[:4])
