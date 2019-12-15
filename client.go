@@ -305,6 +305,11 @@ loop:
 		case TYPE_PINGREQ:
 			log.Printf("PINGREQ in > %v - %v", fixedHeader, remLen)
 			c.emit(MakePingRespPacket())
+		case TYPE_DISCONNECT:
+			// TODO: discard Will message without sending it out
+			break loop
+		}
+
 		log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
