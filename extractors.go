@@ -35,7 +35,7 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 		lenBytesEnd := parsedBytes + 2
 		topicLen := int(binary.BigEndian.Uint16(payload[parsedBytes:lenBytesEnd]))
 		topicNameEnd := lenBytesEnd + topicLen
-		topicFilter := string(payload[lenBytesEnd:topicNameEnd])
+		topicFilter := payload[lenBytesEnd:topicNameEnd]
 		qos := payload[topicNameEnd : topicNameEnd+1][0]
 
 		// TODO: add qos validation
@@ -61,7 +61,7 @@ func ExtractUnSubTopicFilters(payload []byte) ([]Filter, error) {
 		lenBytesEnd := parsedBytes + 2
 		topicLen := int(binary.BigEndian.Uint16(payload[parsedBytes:lenBytesEnd]))
 		topicNameEnd := lenBytesEnd + topicLen
-		topicFilter := string(payload[lenBytesEnd:topicNameEnd])
+		topicFilter := payload[lenBytesEnd:topicNameEnd]
 
 		filterList = append(filterList, Filter{Filter: topicFilter}) // this should retrieve topic filters from sub list
 

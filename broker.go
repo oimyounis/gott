@@ -14,14 +14,20 @@ var (
 var GOTT *Broker
 
 type Broker struct {
-	address  string
-	listener net.Listener
-	clients  map[string]*Client
-	mutex    sync.RWMutex
+	address            string
+	listener           net.Listener
+	clients            map[string]*Client
+	mutex              sync.RWMutex
+	TopicFilterStorage *TopicStorage
 }
 
 func NewBroker(address string) *Broker {
-	GOTT = &Broker{address: address, listener: nil, clients: map[string]*Client{}}
+	GOTT = &Broker{
+		address:            address,
+		listener:           nil,
+		clients:            map[string]*Client{},
+		TopicFilterStorage: &TopicStorage{},
+	}
 	return GOTT
 }
 

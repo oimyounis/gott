@@ -9,6 +9,6 @@ type PublishFlags struct {
 }
 
 type Filter struct {
-	Filter string
+	Filter []byte
 	QoS    byte
 }

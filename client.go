@@ -42,9 +42,10 @@ loop:
 		}
 
 		fixedHeader := make([]byte, 2)
+
 		_, err := sockBuffer.Read(fixedHeader)
 		if err != nil {
-			log.Println("read error", err)
+			log.Println("fixedHeader read error", err)
 			break
 		}
 		log.Println("read", fixedHeader)
@@ -207,8 +208,10 @@ loop:
 			// TODO: implement re-publishing to other clients
 			// TODO: implement retention policy
 		case TYPE_PUBACK:
+			log.Println("PUBACK in")
 			break
 		case TYPE_PUBREC:
+			log.Println("PUBREC in")
 			break
 		case TYPE_PUBREL:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
@@ -223,9 +226,10 @@ loop:
 			}
 
 			//packetId := binary.BigEndian.Uint16(packetIdBytes)
-			//log.Println("PUBREL in", packetId)
+			log.Println("PUBREL in", packetIdBytes)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
+			log.Println("PUBCOMP in")
 			break
 		case TYPE_SUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
@@ -234,8 +238,8 @@ loop:
 			}
 
 			if remLen < 3 {
+				log.Println("malformed SUBSCRIBE packet: remLen < 3")
 				break loop
-				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
 			}
 
 			remBytes := make([]byte, remLen)
@@ -249,7 +253,8 @@ loop:
 			payload := remBytes[2:]
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
-				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
+				log.Println("malformed SUBSCRIBE packet: remLen < 3")
+				break loop
 			}
 
 			filterList, err := ExtractSubTopicFilters(payload)
@@ -260,11 +265,19 @@ loop:
 
 			log.Printf("SUBSCRIBE in > id: %v - list: %#v", packetId, filterList)
 
-			// TODO: implement SUB list in broker and process SUBs
 			// NOTE: see [MQTT-3.8.4-3] when implementing the SUB list, retention policy and server > clients publish
 
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
+
+			//go func(filterList []Filter) {
+			for _, filter := range filterList {
+				GOTT.TopicFilterStorage.Subscribe(c, filter.Filter, filter.QoS)
+			}
+
+			GOTT.TopicFilterStorage.Print()
+			//}(filterList)
+
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
@@ -340,4 +353,5 @@ func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
+	log.Println("emit out <", packet)
 }
