@@ -234,6 +234,7 @@ loop:
 			}
 
 			if remLen < 3 {
+				break loop
 				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
 			}
 
@@ -251,7 +252,7 @@ loop:
 				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
 			}
 
-			filterList, err := ExtractTopicFilters(payload)
+			filterList, err := ExtractSubTopicFilters(payload)
 			if err != nil {
 				log.Println("malformed SUBSCRIBE packet:", err)
 				break loop
@@ -265,6 +266,7 @@ loop:
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
 		}
+
 		log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
