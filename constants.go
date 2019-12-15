@@ -44,6 +44,8 @@ const (
 	PUBREL_REM_LEN         = 2 // 2 is constant remaining len as per [3.6.1]
 	PUBCOMP_REM_LEN        = 2 // 2 is constant remaining len as per [3.7.1]
 	SUBACK_REM_LEN         = 2 // 2 is constant remaining len as per [3.9.2]
+	UNSUBACK_REM_LEN       = 2 // 2 is constant remaining len as per [3.11.1]
+	PINGRESP_REM_LEN       = 0 // 0 is constant remaining len as per [3.13.1]
 )
 
 const (
