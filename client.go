@@ -26,6 +26,13 @@ func (c *Client) listen() {
 		return
 	}
 
+	defer func() { // TODO: this needs thorough testing
+		if r := recover(); r != nil {
+			log.Println("Recovered in listen", r)
+			// TODO: report panic to remote service
+		}
+	}()
+
 	sockBuffer := bufio.NewReader(c.connection)
 
 loop:
