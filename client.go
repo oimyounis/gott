@@ -14,10 +14,11 @@ import (
 )
 
 type Client struct {
-	connection    net.Conn
-	connected     bool
-	keepAliveSecs int
-	ClientId      string
+	connection           net.Conn
+	connected            bool
+	keepAliveSecs        int
+	lastPacketReceivedOn time.Time
+	ClientId             string
 }
 
 func (c *Client) listen() {
@@ -61,6 +62,8 @@ loop:
 		}
 
 		//log.Println("packetType:", packetType, "remLen:", remLen)
+
+		c.lastPacketReceivedOn = time.Now()
 
 		switch packetType {
 		case TYPE_CONNECT:
@@ -255,6 +258,7 @@ loop:
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
 		}
+		log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
 }
