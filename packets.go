@@ -39,6 +39,11 @@ func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
 	return packet
 }
 
+func MakeUnSubAckPacket(id []byte) []byte {
+	packet := []byte{TYPE_UNSUBACK_BYTE, UNSUBACK_REM_LEN, id[0], id[1]}
+	log.Println("UNSUBACK", packet)
+	return packet
+}
 // Not completed yet
 func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
 	// TODO: complete the implementation of this func
