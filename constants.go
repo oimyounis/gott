@@ -51,3 +51,9 @@ const (
 const (
 	SUBACK_FAILURE_CODE byte = 128
 )
+
+var (
+	TOPIC_DELIM                 = []byte{47} // /
+	TOPIC_SINGLE_LEVEL_WILDCARD = []byte{43} // +
+	TOPIC_MULTI_LEVEL_WILDCARD  = []byte{35} // #
+)
