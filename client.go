@@ -265,8 +265,43 @@ loop:
 
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
-		}
+		case TYPE_UNSUBSCRIBE:
+			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
+				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
+				break loop
+			}
 
+			if remLen < 3 {
+				break loop
+				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
+			}
+
+			remBytes := make([]byte, remLen)
+			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+				log.Println("error reading UNSUBSCRIBE packet", err)
+				break loop
+			}
+
+			packetIdBytes := remBytes[0:2]
+			packetId := binary.BigEndian.Uint16(packetIdBytes)
+			payload := remBytes[2:]
+
+			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
+				break loop
+				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
+			}
+
+			filterList, err := ExtractUnSubTopicFilters(payload)
+			if err != nil {
+				log.Println("malformed UNSUBSCRIBE packet:", err)
+				break loop
+			}
+
+			log.Printf("UNSUBSCRIBE in > id: %v - list: %#v", packetId, filterList)
+
+			// TODO: implement removal of sub from subs list
+
+			c.emit(MakeUnSubAckPacket(packetIdBytes))
 		log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
