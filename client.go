@@ -302,6 +302,9 @@ loop:
 			// TODO: implement removal of sub from subs list
 
 			c.emit(MakeUnSubAckPacket(packetIdBytes))
+		case TYPE_PINGREQ:
+			log.Printf("PINGREQ in > %v - %v", fixedHeader, remLen)
+			c.emit(MakePingRespPacket())
 		log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
