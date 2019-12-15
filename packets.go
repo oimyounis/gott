@@ -44,6 +44,13 @@ func MakeUnSubAckPacket(id []byte) []byte {
 	log.Println("UNSUBACK", packet)
 	return packet
 }
+
+func MakePingRespPacket() []byte {
+	packet := []byte{TYPE_PINGRESP_BYTE, PINGRESP_REM_LEN}
+	log.Println("PINGRESP", packet)
+	return packet
+}
+
 // Not completed yet
 func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
 	// TODO: complete the implementation of this func
