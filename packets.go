@@ -2,6 +2,7 @@ package gott
 
 import (
 	"encoding/binary"
+	"gott/bytes"
 	"log"
 )
 
@@ -30,7 +31,11 @@ func MakePubCompPacket(id []byte) []byte {
 }
 
 func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
-	packet := []byte{TYPE_SUBACK_BYTE, SUBACK_REM_LEN, id[0], id[1]}
+	packet := []byte{TYPE_SUBACK_BYTE}
+
+	packet = append(packet, bytes.Encode(SUBACK_REM_LEN+len(filterList))...)
+	packet = append(packet, id...)
+
 	for _, filter := range filterList {
 		packet = append(packet, filter.QoS) // QoS here should be the Maximum QoS determined by the server, see [3.8.4]
 		// in case of failure append SUBACK_FAILURE_CODE (128)
