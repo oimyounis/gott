@@ -26,7 +26,7 @@ func ExtractPublishFlags(bits string) PublishFlags {
 	}
 }
 
-func ExtractTopicFilters(payload []byte) ([]Filter, error) {
+func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 	filterList := make([]Filter, 0)
 	parsedBytes := 0
 	payloadLen := len(payload)
