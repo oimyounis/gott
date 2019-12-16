@@ -3,6 +3,7 @@ package gott
 import (
 	gob "bytes"
 	"fmt"
+	"gott/utils"
 	"log"
 	"strings"
 )
@@ -233,7 +234,7 @@ func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
 
 func ValidateFilter(filter []byte) bool {
 	multiWildcard := gob.IndexByte(filter, TOPIC_MULTI_LEVEL_WILDCARD[0])
-	singleWildcard := gob.IndexByte(filter, TOPIC_SINGLE_LEVEL_WILDCARD[0]) // TODO: cover multiple wildcards
+	singleWildcards := utils.IndexAllByte(filter, TOPIC_SINGLE_LEVEL_WILDCARD[0])
 	filterLen := len(filter)
 
 	if filterLen == 0 {
@@ -244,8 +245,12 @@ func ValidateFilter(filter []byte) bool {
 		return false
 	}
 
-	if singleWildcard > 0 && filter[singleWildcard-1] != TOPIC_DELIM[0] { // TODO: cover multiple wildcards
-		return false
+	for _, idx := range singleWildcards {
+		if idx > 0 && filter[idx-1] != TOPIC_DELIM[0] {
+			return false
+		} else if filterLen > 1 && idx == 0 && idx != filterLen-1 && filter[idx+1] != TOPIC_DELIM[0] {
+			return false
+		}
 	}
 
 	return true
