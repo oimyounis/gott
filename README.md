@@ -9,20 +9,20 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - Currently implementing the MQTT v3.1.1 spec.
 
 ## Todo
-[x] Ping.
-[x] Topic filtering with wildcards support.
-[x] Subscriptions.
-[x] QoS 0 message publishing.
-[] Fully working QoS 1 and 2 message publishing.
-[] Retained messages.
-[] Sessions.
-[] Will messages.
-[] MQTT v5.
-[] TLS.
-[] Message persistence (save to DB).
-[] Plug-ins (maybe).
-[] Clustering (also maybe).
-[] WebSockets.
+- [x] Ping.
+- [x] Topic filtering with wildcards support.
+- [x] Subscriptions.
+- [x] QoS 0 message publishing.
+- [ ] Fully working QoS 1 and 2 message publishing.
+- [ ] Retained messages.
+- [ ] Sessions.
+- [ ] Will messages.
+- [ ] MQTT v5.
+- [ ] TLS.
+- [ ] Message persistence (save to DB).
+- [ ] Plug-ins (maybe).
+- [ ] Clustering (also maybe).
+- [ ] WebSockets.
 
 ## Installation
 Just clone/download this repo and build/run `main/main.go`.
