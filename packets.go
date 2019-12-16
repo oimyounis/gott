@@ -60,9 +60,7 @@ func MakePingRespPacket() []byte {
 	return packet
 }
 
-// Not completed yet
 func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
-	// TODO: complete the implementation of this func
 	if qos == 0 { // as per [MQTT-3.3.1-2]
 		dupFlag = 0
 	}
