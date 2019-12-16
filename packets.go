@@ -37,7 +37,7 @@ func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
 	packet = append(packet, id...)
 
 	for _, filter := range filterList {
-		if ValidateFilter(filter.Filter) {
+		if ValidFilter(filter.Filter) {
 			packet = append(packet, filter.QoS) // QoS here should be the Maximum QoS determined by the server, see [3.8.4]
 		} else {
 			// in case of failure append SUBACK_FAILURE_CODE (128)
@@ -63,12 +63,15 @@ func MakePingRespPacket() []byte {
 // Not completed yet
 func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
 	// TODO: complete the implementation of this func
+	if qos == 0 { // as per [MQTT-3.3.1-2]
+		dupFlag = 0
+	}
 	if topic == nil {
-		return nil
+		return
 	}
 
-	// 2nd byte = remaining length (var header len + payload len)
-	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag, 0}
+	// 2nd byte... = remaining length (var header len + payload len)
+	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag}
 
 	varHeader := make([]byte, 2) // topic name + packet identifier
 	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
@@ -79,6 +82,10 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], uint16(packetSeq.Next()))
 	}
 
-	log.Println(fixedHeader, "-", varHeader)
+	packet = append(packet, fixedHeader...)
+	packet = append(packet, bytes.Encode(len(varHeader)+len(payload))...)
+	packet = append(packet, varHeader...)
+	packet = append(packet, payload...)
+
 	return
 }

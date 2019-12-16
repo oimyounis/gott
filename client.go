@@ -161,7 +161,11 @@ loop:
 				//c.publish([]byte(""), []byte(""), 0, 0, 0)
 			}(c)
 		case TYPE_PUBLISH:
-			publishFlags := ExtractPublishFlags(flagsBits)
+			publishFlags, err := ExtractPublishFlags(flagsBits)
+			if err != nil {
+				log.Println("error reading publish packet", err)
+				break loop
+			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
@@ -181,32 +185,40 @@ loop:
 			}
 
 			topicEnd := 2 + topicLen
-			topic := string(remBytes[2:topicEnd])
+			topic := remBytes[2:topicEnd]
+
+			if !ValidTopicName(topic) {
+				log.Println("malformed packet: invalid topic name")
+				break loop
+			}
+
 			var packetId uint16
 			var packetIdBytes []byte
 
 			varHeaderEnd := topicEnd
 
-			if publishFlags.QoS != "00" { // QoS = 1 or 2
+			if publishFlags.QoS != 0 {
 				packetIdBytes = remBytes[topicEnd : 2+topicEnd]
 				packetId = binary.BigEndian.Uint16(packetIdBytes)
 				varHeaderEnd += 2
 			}
 
-			payload := string(remBytes[varHeaderEnd:])
+			payload := remBytes[varHeaderEnd:]
 
 			log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
 
-			if publishFlags.QoS == "01" { // QoS level 1
+			if publishFlags.QoS == 1 {
 				// return a PUBACK
 				c.emit(MakePubAckPacket(packetIdBytes))
-			} else if publishFlags.QoS == "10" { // QoS level 2
+			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
 				c.emit(MakePubRecPacket(packetIdBytes))
 			}
-			// TODO: implement topic filter
+
+			GOTT.Publish(topic, payload, publishFlags)
+
 			// TODO: implement re-publishing to other clients
-			// TODO: implement retention policy
+			// TODO: implement retention policy, also see [3.3.1.3]
 		case TYPE_PUBACK:
 			log.Println("PUBACK in")
 			break
@@ -275,7 +287,6 @@ loop:
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
 
-			GOTT.TopicFilterStorage.Print()
 			//}(filterList)
 
 		case TYPE_UNSUBSCRIBE:
@@ -332,7 +343,7 @@ func (c *Client) disconnect() {
 	if GOTT == nil {
 		return
 	}
-
+	// TODO: remove client from sub lists on disconnect
 	c.closeConnection()
 	GOTT.removeClient(c.ClientId)
 }
@@ -353,5 +364,5 @@ func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
-	log.Println("emit out <", packet)
+	log.Println("emit out <", c.ClientId, packet)
 }

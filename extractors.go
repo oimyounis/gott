@@ -18,12 +18,47 @@ func ExtractConnectFlags(bits string) ConnectFlags {
 	}
 }
 
-func ExtractPublishFlags(bits string) PublishFlags {
-	return PublishFlags{
-		DUP:    bits[0:1],
-		QoS:    bits[1:3],
-		Retain: bits[3:],
+var noopFlags = PublishFlags{}
+
+func ExtractPublishFlags(bits string) (PublishFlags, error) {
+	var (
+		qos, dup, retain byte
+	)
+
+	switch bits[1:3] {
+	case "00":
+		qos = 0
+	case "01":
+		qos = 1
+	case "10":
+		qos = 2
+	default:
+		return noopFlags, errors.New("invalid flags in publish packet")
 	}
+
+	switch bits[3:] {
+	case "0":
+		retain = 0
+	case "1":
+		retain = 1
+	default:
+		return noopFlags, errors.New("invalid flags in publish packet")
+	}
+
+	switch bits[0:1] {
+	case "0":
+		dup = 0
+	case "1":
+		dup = 1
+	default:
+		return noopFlags, errors.New("invalid flags in publish packet")
+	}
+
+	return PublishFlags{
+		DUP:    dup,
+		QoS:    qos,
+		Retain: retain,
+	}, nil
 }
 
 func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {

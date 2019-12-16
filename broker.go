@@ -3,6 +3,7 @@ package gott
 import (
 	gob "bytes"
 	"log"
+	"math"
 	"net"
 	"sync"
 )
@@ -107,8 +108,17 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	tl.ParseChildren(client, segs[1:], qos)
 }
 
-func (b *Broker) Publish(topic, msg []byte, qos byte) {
+func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
-	m := b.TopicFilterStorage.Match(topic)
-	log.Println(string(topic), "matches", m)
+	matches := b.TopicFilterStorage.Match(topic)
+	log.Println(string(topic), "matches", matches)
+
+	for _, match := range matches {
+		for _, sub := range match.Subscriptions {
+			// dup: [MQTT-3.3.1.-1], [MQTT-3.3.1-3]
+			if sub.Client.connected { // TODO: remove clients from sub lists on disconnect
+				sub.Client.emit(MakePublishPacket(topic, payload, 0, byte(math.Min(float64(sub.QoS), float64(flags.QoS))), 0))
+			}
+		}
+	}
 }
