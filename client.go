@@ -272,7 +272,7 @@ loop:
 
 			//go func(filterList []Filter) {
 			for _, filter := range filterList {
-				GOTT.TopicFilterStorage.Subscribe(c, filter.Filter, filter.QoS)
+				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
 
 			GOTT.TopicFilterStorage.Print()

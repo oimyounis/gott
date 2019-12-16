@@ -1,6 +1,7 @@
 package gott
 
 import (
+	gob "bytes"
 	"log"
 	"net"
 	"sync"
@@ -77,4 +78,33 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	//client := b.addClient(conn)
 	c := &Client{connection: conn, connected: true}
 	go c.listen()
+}
+
+func (b *Broker) Subscribe(client *Client, bytes []byte, qos byte) {
+	segs := gob.Split(bytes, TOPIC_DELIM)
+
+	segsLen := len(segs)
+	if segsLen == 0 {
+		return
+	}
+
+	topLevel := segs[0]
+	tl := b.TopicFilterStorage.Find(topLevel)
+	if tl == nil {
+		tl = &TopicLevel{bytes: topLevel}
+		b.TopicFilterStorage.AddTopLevel(tl)
+	}
+
+	if segsLen == 1 {
+		tl.CreateOrUpdateSubscription(client, qos)
+		return
+	}
+
+	tl.ParseChildren(client, segs[1:], qos)
+}
+
+func (b *Broker) Publish(topic, msg []byte, qos byte) {
+	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
+	m := b.TopicFilterStorage.Match(topic)
+	log.Println(string(topic), "matches", m)
 }

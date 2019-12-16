@@ -212,29 +212,6 @@ func (ts *TopicStorage) Match(topic []byte) []*TopicLevel {
 	return matches
 }
 
-func (ts *TopicStorage) Subscribe(client *Client, bytes []byte, qos byte) {
-	segs := gob.Split(bytes, TOPIC_DELIM)
-
-	segsLen := len(segs)
-	if segsLen == 0 {
-		return
-	}
-
-	topLevel := segs[0]
-	tl := ts.Find(topLevel)
-	if tl == nil {
-		tl = &TopicLevel{bytes: topLevel}
-		ts.AddTopLevel(tl)
-	}
-
-	if segsLen == 1 {
-		tl.CreateOrUpdateSubscription(client, qos)
-		return
-	}
-
-	tl.ParseChildren(client, segs[1:], qos)
-}
-
 func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
 	if (len(t.Subscriptions) != 0 || len(t.children) == 0) && len(segs) == 0 || (gob.Equal(t.bytes, TOPIC_SINGLE_LEVEL_WILDCARD) && len(t.children) == 0 && len(segs) == 0) || gob.Equal(t.bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
 		*matches = append(*matches, t)
@@ -254,7 +231,7 @@ func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
 	return nil
 }
 
-func (ts *TopicStorage) Publish(topic, msg []byte, qos byte) {
+func ValidateFilter(filter []byte) bool {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
 	m := ts.Match(topic)
 	log.Println(string(topic), "matches", m)
