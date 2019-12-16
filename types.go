@@ -5,7 +5,7 @@ type ConnectFlags struct {
 }
 
 type PublishFlags struct {
-	DUP, QoS, Retain string
+	DUP, QoS, Retain byte
 }
 
 type Filter struct {
