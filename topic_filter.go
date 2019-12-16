@@ -240,7 +240,7 @@ func ValidateFilter(filter []byte) bool {
 		return false
 	}
 
-	if gob.Count(filter, TOPIC_MULTI_LEVEL_WILDCARD) > 1 || multiWildcard != -1 && multiWildcard != filterLen-1 || (multiWildcard != 0 && filter[multiWildcard-1] != TOPIC_DELIM[0]) {
+	if gob.Count(filter, TOPIC_MULTI_LEVEL_WILDCARD) > 1 || multiWildcard != -1 && multiWildcard != filterLen-1 || (multiWildcard > 0 && filter[multiWildcard-1] != TOPIC_DELIM[0]) {
 		return false
 	}
 
