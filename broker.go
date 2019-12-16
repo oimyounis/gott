@@ -110,6 +110,10 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 
 func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
+	if !ValidTopicName(topic) {
+		return
+	}
+
 	matches := b.TopicFilterStorage.Match(topic)
 	log.Println(string(topic), "matches", matches)
 
