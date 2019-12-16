@@ -6,20 +6,29 @@ It needs a lot of optimizations and improvements to be functional and usable for
 
 ## Project Status
 - GOTT is currently in a very early stage and is under heavy development. It is not stable or complete enough to be used in production.
-- Currently implementing the MQTT v3.1.1 spec
-- Only QoS 0 messages are fully implemented
-- No message retention yet
-- QoS 1 and 2 messages aren't fully working yet
-- Sessions are not implemented yet
-- Will messages are not implemented yet
-- MQTT v5 is in the plan but after finishing all of the above
-- WebSockets is also in the plan
+- Currently implementing the MQTT v3.1.1 spec.
+
+## Todo
+[x] Ping.
+[x] Topic filtering with wildcards support.
+[x] Subscriptions.
+[x] QoS 0 message publishing.
+[] Fully working QoS 1 and 2 message publishing.
+[] Retained messages.
+[] Sessions.
+[] Will messages.
+[] MQTT v5.
+[] TLS.
+[] Message persistence (save to DB).
+[] Plug-ins (maybe).
+[] Clustering (also maybe).
+[] WebSockets.
 
 ## Installation
-Just clone/download this repo and build/run `main/main.go`
+Just clone/download this repo and build/run `main/main.go`.
 
 ## License
-Apache License 2.0  
+Apache License 2.0, see LICENSE.
 
 ## Contribution
 You are very welcome to submit a new feature, fix a bug, an optimization to the code or even a benchmark would be helpful.  
