@@ -255,3 +255,7 @@ func ValidFilter(filter []byte) bool {
 
 	return true
 }
+
+func ValidTopicName(topicName []byte) bool {
+	return gob.IndexByte(topicName, TOPIC_MULTI_LEVEL_WILDCARD[0]) == -1 && gob.IndexByte(topicName, TOPIC_SINGLE_LEVEL_WILDCARD[0]) == -1 && len(topicName) > 0
+}
