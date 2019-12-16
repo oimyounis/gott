@@ -232,7 +232,7 @@ func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
 	return nil
 }
 
-func ValidateFilter(filter []byte) bool {
+func ValidFilter(filter []byte) bool {
 	multiWildcard := gob.IndexByte(filter, TOPIC_MULTI_LEVEL_WILDCARD[0])
 	singleWildcards := utils.IndexAllByte(filter, TOPIC_SINGLE_LEVEL_WILDCARD[0])
 	filterLen := len(filter)

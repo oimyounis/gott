@@ -80,8 +80,12 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	go c.listen()
 }
 
-func (b *Broker) Subscribe(client *Client, bytes []byte, qos byte) {
-	segs := gob.Split(bytes, TOPIC_DELIM)
+func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
+	if !ValidFilter(filter) {
+		return
+	}
+
+	segs := gob.Split(filter, TOPIC_DELIM)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
