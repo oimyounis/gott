@@ -232,7 +232,21 @@ func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
 }
 
 func ValidateFilter(filter []byte) bool {
-	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
-	m := ts.Match(topic)
-	log.Println(string(topic), "matches", m)
+	multiWildcard := gob.IndexByte(filter, TOPIC_MULTI_LEVEL_WILDCARD[0])
+	singleWildcard := gob.IndexByte(filter, TOPIC_SINGLE_LEVEL_WILDCARD[0]) // TODO: cover multiple wildcards
+	filterLen := len(filter)
+
+	if filterLen == 0 {
+		return false
+	}
+
+	if gob.Count(filter, TOPIC_MULTI_LEVEL_WILDCARD) > 1 || multiWildcard != -1 && multiWildcard != filterLen-1 || (multiWildcard != 0 && filter[multiWildcard-1] != TOPIC_DELIM[0]) {
+		return false
+	}
+
+	if singleWildcard > 0 && filter[singleWildcard-1] != TOPIC_DELIM[0] { // TODO: cover multiple wildcards
+		return false
+	}
+
+	return true
 }

@@ -37,8 +37,12 @@ func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
 	packet = append(packet, id...)
 
 	for _, filter := range filterList {
-		packet = append(packet, filter.QoS) // QoS here should be the Maximum QoS determined by the server, see [3.8.4]
-		// in case of failure append SUBACK_FAILURE_CODE (128)
+		if ValidateFilter(filter.Filter) {
+			packet = append(packet, filter.QoS) // QoS here should be the Maximum QoS determined by the server, see [3.8.4]
+		} else {
+			// in case of failure append SUBACK_FAILURE_CODE (128)
+			packet = append(packet, SUBACK_FAILURE_CODE)
+		}
 	}
 	log.Println("SUBACK", packet)
 	return packet
