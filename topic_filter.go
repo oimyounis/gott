@@ -98,12 +98,23 @@ func (tl *TopicLevel) FindAll(b []byte) (matches []*TopicLevel) {
 }
 
 func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
-	for _, sub := range tl.Subscriptions {
+	for i, sub := range tl.Subscriptions {
 		if sub.Client.ClientId == client.ClientId {
-			sub.QoS = qos
-			return
+			if sub.Client.connected {
+				sub.QoS = qos
+				return
+			} else {
+				// TODO: remove clients from sub lists on disconnect
+				var newSubs []*Subscription
+				newSubs = append(newSubs, tl.Subscriptions[:i]...)
+				if i != len(tl.Subscriptions)-1 {
+					newSubs = append(newSubs, tl.Subscriptions[i+1:]...)
+				}
+				tl.Subscriptions = newSubs
+			}
 		}
 	}
+
 	tl.Subscriptions = append(tl.Subscriptions, &Subscription{
 		Client: client,
 		QoS:    qos,
