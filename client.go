@@ -123,7 +123,7 @@ loop:
 			//log.Println("payload", payload)
 
 			// client id parsing
-			clientIdLen := int(binary.BigEndian.Uint16(payload[0:2])) // maximum is 65535 bytes
+			clientIdLen := int(binary.BigEndian.Uint16(payload[0:2])) // maximum client ID length is 65535 bytes
 			if clientIdLen == 0 {
 				if connFlags.CleanSession == "0" {
 					log.Println("connect error: received zero byte client id with clean session flag set to 0")
@@ -192,6 +192,7 @@ loop:
 				packetIdBytes = remBytes[topicEnd : 2+topicEnd]
 				packetId = binary.BigEndian.Uint16(packetIdBytes)
 				varHeaderEnd += 2
+				publishFlags.PacketId = packetId
 			}
 
 			payload := remBytes[varHeaderEnd:]
@@ -203,10 +204,17 @@ loop:
 				c.emit(MakePubAckPacket(packetIdBytes))
 			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
+				if publishFlags.DUP == 1 {
+					if msg := c.MessageStore.Get(packetId); msg != nil {
+						c.emit(MakePubRecPacket(packetIdBytes))
+						break // skip resending message
+					}
+				}
 				c.MessageStore.Store(packetId, &ClientMessage{
 					Topic:   topic,
 					Payload: payload,
 					QoS:     publishFlags.QoS,
+					Status:  STATUS_PUBREC_RECEIVED,
 				})
 				c.emit(MakePubRecPacket(packetIdBytes))
 			}
@@ -232,7 +240,7 @@ loop:
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 			log.Printf("1 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
-			GOTT.MessageStore.Acknowledge(packetId)
+			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
 
 			log.Println("PUBACK in > packetId", packetId)
 			log.Printf("2 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
@@ -254,7 +262,7 @@ loop:
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 			log.Printf("1 PUBREC in > MessageStore %#s", GOTT.MessageStore.messages)
-			GOTT.MessageStore.Acknowledge(packetId)
+			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
 
 			c.emit(MakePubRelPacket(packetIdBytes))
 
@@ -274,7 +282,7 @@ loop:
 
 			packetId := binary.BigEndian.Uint16(packetIdBytes)
 			log.Println("PUBREL in", packetIdBytes)
-			c.MessageStore.Acknowledge(packetId)
+			c.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
 			if remLen != 2 {
@@ -294,7 +302,7 @@ loop:
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 			log.Printf("1 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
-			GOTT.MessageStore.Acknowledge(packetId)
+			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
 
 			log.Println("PUBCOMP in > packetId", packetId)
 			log.Printf("2 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
@@ -385,6 +393,9 @@ loop:
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
 			// TODO: discard Will message without sending it out
+			break loop
+		default:
+			log.Println("UNKNOWN PACKET TYPE")
 			break loop
 		}
 
