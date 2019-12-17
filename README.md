@@ -1,5 +1,5 @@
 # GOTT
-GOTT is a MQTT Broker written in pure go. Aims to be a high-performance broker with all the features that can be embedded in a broker available out of the box.  
+GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance broker with most of the features that could be embedded in a broker available out of the box.  
   
 It needs a lot of optimizations and improvements to be functional and usable for production.  
 **Hopefully with your contribution we could build something great!**
