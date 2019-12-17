@@ -13,20 +13,19 @@ func MakeConnAckPacket(sessionPresent, returnCode byte) []byte {
 }
 
 func MakePubAckPacket(id []byte) []byte {
-	//binary.BigEndian.PutUint16(packet[2:], id)
-	//log.Println("PUBACK", packet)
 	return []byte{TYPE_PUBACK_BYTE, PUBACK_REM_LEN, id[0], id[1]}
 }
 
 func MakePubRecPacket(id []byte) []byte {
-	//binary.BigEndian.PutUint16(packet[2:], id)
-	//log.Println("PUBREC", packet)
 	return []byte{TYPE_PUBREC_BYTE, PUBREC_REM_LEN, id[0], id[1]}
 }
 
+func MakePubRelPacket(id []byte) []byte {
+	// +2 according to [MQTT-3.6.1-1]
+	return []byte{TYPE_PUBREL_BYTE + 2, PUBREL_REM_LEN, id[0], id[1]}
+}
+
 func MakePubCompPacket(id []byte) []byte {
-	//binary.BigEndian.PutUint16(packet[2:], id)
-	//log.Println("PUBCOMP", packet)
 	return []byte{TYPE_PUBCOMP_BYTE, PUBCOMP_REM_LEN, id[0], id[1]}
 }
 
@@ -60,7 +59,7 @@ func MakePingRespPacket() []byte {
 	return packet
 }
 
-func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
+func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte, packetId uint16) {
 	if qos == 0 { // as per [MQTT-3.3.1-2]
 		dupFlag = 0
 	}
@@ -77,7 +76,8 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 
 	if qos >= 1 {
 		varHeader = append(varHeader, 0, 0)
-		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], uint16(packetSeq.Next()))
+		packetId = uint16(packetSeq.Next())
+		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetId)
 	}
 
 	packet = append(packet, fixedHeader...)
