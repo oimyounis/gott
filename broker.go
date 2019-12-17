@@ -21,6 +21,7 @@ type Broker struct {
 	clients            map[string]*Client
 	mutex              sync.RWMutex
 	TopicFilterStorage *TopicStorage
+	MessageStore       *MessageStore
 }
 
 func NewBroker(address string) *Broker {
@@ -29,6 +30,7 @@ func NewBroker(address string) *Broker {
 		listener:           nil,
 		clients:            map[string]*Client{},
 		TopicFilterStorage: &TopicStorage{},
+		MessageStore:       NewMessageStore(),
 	}
 	return GOTT
 }
@@ -77,7 +79,11 @@ func (b *Broker) removeClient(clientId string) {
 func (b *Broker) handleConnection(conn net.Conn) {
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 	//client := b.addClient(conn)
-	c := &Client{connection: conn, connected: true}
+	c := &Client{
+		connection:   conn,
+		connected:    true,
+		MessageStore: NewMessageStore(),
+	}
 	go c.listen()
 }
 
@@ -119,9 +125,19 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 
 	for _, match := range matches {
 		for _, sub := range match.Subscriptions {
-			// dup: [MQTT-3.3.1.-1], [MQTT-3.3.1-3]
-			if sub.Client.connected { // TODO: remove clients from sub lists on disconnect
-				sub.Client.emit(MakePublishPacket(topic, payload, 0, byte(math.Min(float64(sub.QoS), float64(flags.QoS))), 0))
+			if sub.Client.connected {
+				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
+				// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
+				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
+				if qos != 0 {
+					b.MessageStore.Store(packetId, &ClientMessage{
+						Topic:   topic,
+						Payload: payload,
+						QoS:     qos,
+						Client:  sub.Client,
+					})
+				}
+				sub.Client.emit(packet)
 			}
 		}
 	}

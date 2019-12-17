@@ -19,6 +19,7 @@ type Client struct {
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
 	ClientId             string
+	MessageStore         *MessageStore
 }
 
 func (c *Client) listen() {
@@ -150,11 +151,6 @@ loop:
 			log.Println("client connected with id:", c.ClientId)
 			GOTT.addClient(c)
 			c.emit(MakeConnAckPacket(0, CONNECT_ACCEPTED)) // TODO: fix sessionPresent after implementing sessions
-
-			go func(c *Client) {
-				time.Sleep(time.Second * 2)
-				//c.publish([]byte(""), []byte(""), 0, 0, 0)
-			}(c)
 		case TYPE_PUBLISH:
 			publishFlags, err := ExtractPublishFlags(flagsBits)
 			if err != nil {
@@ -207,19 +203,63 @@ loop:
 				c.emit(MakePubAckPacket(packetIdBytes))
 			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
+				c.MessageStore.Store(packetId, &ClientMessage{
+					Topic:   topic,
+					Payload: payload,
+					QoS:     publishFlags.QoS,
+				})
 				c.emit(MakePubRecPacket(packetIdBytes))
 			}
 
 			GOTT.Publish(topic, payload, publishFlags)
 
-			// TODO: implement re-publishing to other clients
 			// TODO: implement retention policy, also see [3.3.1.3]
 		case TYPE_PUBACK:
-			log.Println("PUBACK in")
-			break
+			if remLen != 2 {
+				log.Println("malformed PUBACK packet: invalid remaining length")
+				break loop
+			}
+
+			remBytes := make([]byte, remLen)
+			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+				log.Println("error reading PUBACK packet", err)
+				break loop
+			}
+
+			var packetId uint16
+			var packetIdBytes []byte
+
+			packetIdBytes = remBytes
+			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			log.Printf("1 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
+			GOTT.MessageStore.Acknowledge(packetId)
+
+			log.Println("PUBACK in > packetId", packetId)
+			log.Printf("2 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
 		case TYPE_PUBREC:
-			log.Println("PUBREC in")
-			break
+			if remLen != 2 {
+				log.Println("malformed PUBREC packet: invalid remaining length")
+				break loop
+			}
+
+			remBytes := make([]byte, remLen)
+			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+				log.Println("error reading PUBREC packet", err)
+				break loop
+			}
+
+			var packetId uint16
+			var packetIdBytes []byte
+
+			packetIdBytes = remBytes
+			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			log.Printf("1 PUBREC in > MessageStore %#s", GOTT.MessageStore.messages)
+			GOTT.MessageStore.Acknowledge(packetId)
+
+			c.emit(MakePubRelPacket(packetIdBytes))
+
+			log.Println("PUBREC in > packetId", packetId)
+			log.Printf("2 PUBREC in > MessageStore %#s", GOTT.MessageStore.messages)
 		case TYPE_PUBREL:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
 				log.Println("malformed PUBREL packet: flags bits != 0010")
@@ -232,12 +272,32 @@ loop:
 				break loop
 			}
 
-			//packetId := binary.BigEndian.Uint16(packetIdBytes)
+			packetId := binary.BigEndian.Uint16(packetIdBytes)
 			log.Println("PUBREL in", packetIdBytes)
+			c.MessageStore.Acknowledge(packetId)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
-			log.Println("PUBCOMP in")
-			break
+			if remLen != 2 {
+				log.Println("malformed PUBCOMP packet: invalid remaining length")
+				break loop
+			}
+
+			remBytes := make([]byte, remLen)
+			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+				log.Println("error reading PUBCOMP packet", err)
+				break loop
+			}
+
+			var packetId uint16
+			var packetIdBytes []byte
+
+			packetIdBytes = remBytes
+			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			log.Printf("1 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
+			GOTT.MessageStore.Acknowledge(packetId)
+
+			log.Println("PUBCOMP in > packetId", packetId)
+			log.Printf("2 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
 		case TYPE_SUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
@@ -283,7 +343,6 @@ loop:
 			}
 
 			//}(filterList)
-
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")

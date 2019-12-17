@@ -57,3 +57,8 @@ var (
 	TOPIC_SINGLE_LEVEL_WILDCARD = []byte{43} // +
 	TOPIC_MULTI_LEVEL_WILDCARD  = []byte{35} // #
 )
+
+const (
+	STATUS_UNACKNOWLEDGED byte = iota
+	STATUS_PUBREC_RECEIVED
+)
