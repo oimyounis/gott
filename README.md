@@ -13,10 +13,12 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] Topic filtering with wildcards support.
 - [x] Subscriptions.
 - [x] QoS 0 message publishing.
-- [ ] Fully working QoS 1 and 2 message publishing.
+- [ ] Fully working QoS 1 publishing.
+- [ ] Fully working QoS 2 publishing.
 - [ ] Retained messages.
 - [ ] Sessions.
 - [ ] Will messages.
+- [ ] Username and password authentication
 - [ ] MQTT v5.
 - [ ] TLS.
 - [ ] Message persistence (save to DB).
