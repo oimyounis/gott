@@ -13,17 +13,17 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] Topic filtering with wildcards support.
 - [x] Subscriptions.
 - [x] QoS 0 message publishing.
-- [ ] Fully working QoS 1 publishing.
-- [ ] Fully working QoS 2 publishing.
+- [x] QoS 1 message publishing.
+- [x] QoS 2 message publishing.
+- [ ] Handle client disconnections properly.
 - [ ] Retained messages.
 - [ ] Sessions.
 - [ ] Will messages.
-- [ ] Username and password authentication
+- [ ] Username and password authentication.
+- [ ] Plugins.
 - [ ] MQTT v5.
 - [ ] TLS.
-- [ ] Message persistence (save to DB).
-- [ ] Plug-ins (maybe).
-- [ ] Clustering (also maybe).
+- [ ] Clustering (maybe).
 - [ ] WebSockets.
 
 ## Installation
