@@ -2,9 +2,11 @@ package gott
 
 import "log"
 
-func Recover() {
-	if r := recover(); r != nil {
+func Recover() interface{} {
+	r := recover()
+	if r != nil {
 		log.Println("Recovered from panic:", r)
 		// TODO: report panic to remote service
 	}
+	return r
 }
