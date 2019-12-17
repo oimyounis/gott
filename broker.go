@@ -2,10 +2,12 @@ package gott
 
 import (
 	gob "bytes"
+	"encoding/binary"
 	"log"
 	"math"
 	"net"
 	"sync"
+	"time"
 )
 
 var (
@@ -138,9 +140,39 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 						Status:  STATUS_UNACKNOWLEDGED,
 					}
 					b.MessageStore.Store(packetId, msg)
+
+					go Retry(packetId, msg)
 				}
 				sub.Client.emit(packet)
 			}
+		}
+	}
+}
+
+func Retry(packetId uint16, msg *ClientMessage) {
+	defer Recover()
+	for {
+		time.Sleep(time.Second * 5)
+		if msg == nil {
+			return
+		}
+		if msg.Client != nil && msg.Client.connected {
+			switch msg.Status {
+			case STATUS_UNACKNOWLEDGED:
+				msg.Client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, 0)) // TODO: fix retainFlag
+			case STATUS_PUBREC_RECEIVED:
+				packetIdBytes := make([]byte, 2)
+				binary.BigEndian.PutUint16(packetIdBytes, packetId)
+				msg.Client.emit(MakePubRelPacket(packetIdBytes))
+			case STATUS_PUBREL_RECEIVED:
+				packetIdBytes := make([]byte, 2)
+				binary.BigEndian.PutUint16(packetIdBytes, packetId)
+				msg.Client.emit(MakePubCompPacket(packetIdBytes))
+			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
+				return
+			}
+		} else {
+			return
 		}
 	}
 }
