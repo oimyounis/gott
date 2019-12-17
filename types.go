@@ -6,6 +6,7 @@ type ConnectFlags struct {
 
 type PublishFlags struct {
 	DUP, QoS, Retain byte
+	PacketId         uint16
 }
 
 type Filter struct {
