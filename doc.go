@@ -1,5 +1,5 @@
 /*
-GOTT - A MQTT Broker written in pure go
+GOTT - A MQTT Broker written in pure Go
 
 Copyright 2019 Omar Younis (The GOTT author)
 
