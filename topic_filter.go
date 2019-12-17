@@ -10,16 +10,6 @@ import (
 
 var indent = "  "
 
-type Subscription struct {
-	Client *Client
-	QoS    byte
-}
-
-type Message struct {
-	Payload []byte
-	QoS     byte
-}
-
 type TopicLevel struct {
 	bytes                    []byte
 	children                 []*TopicLevel

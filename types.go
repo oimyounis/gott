@@ -12,3 +12,17 @@ type Filter struct {
 	Filter []byte
 	QoS    byte
 }
+
+type Subscription struct {
+	Client *Client
+	QoS    byte
+}
+
+type Message struct {
+	Topic, Payload []byte
+	QoS            byte
+}
+
+type PacketStatus struct {
+	QoS, Status byte
+}
