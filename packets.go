@@ -87,3 +87,31 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 
 	return
 }
+
+func MakePublishPacketWithId(packetId uint16, topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
+	if qos == 0 { // as per [MQTT-3.3.1-2]
+		dupFlag = 0
+	}
+	if topic == nil {
+		return
+	}
+
+	// 2nd byte... = remaining length (var header len + payload len)
+	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag}
+
+	varHeader := make([]byte, 2) // topic name + packet identifier
+	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
+	varHeader = append(varHeader, topic...)
+
+	if qos >= 1 {
+		varHeader = append(varHeader, 0, 0)
+		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetId)
+	}
+
+	packet = append(packet, fixedHeader...)
+	packet = append(packet, bytes.Encode(len(varHeader)+len(payload))...)
+	packet = append(packet, varHeader...)
+	packet = append(packet, payload...)
+
+	return
+}
