@@ -1,7 +1,6 @@
 package gott
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -12,9 +11,9 @@ type ClientMessage struct {
 	Status         byte
 }
 
-func (cm *ClientMessage) String() string {
-	return fmt.Sprintf("%s:%d", cm.Client.ClientId, cm.QoS)
-}
+//func (cm *ClientMessage) String() string {
+//	return fmt.Sprintf("%s:%d", cm.Client.ClientId, cm.QoS)
+//}
 
 type MessageStore struct {
 	messages map[uint16]*ClientMessage
@@ -38,16 +37,12 @@ func (ms *MessageStore) Store(packetId uint16, msg *ClientMessage) {
 	ms.messages[packetId] = msg
 }
 
-func (ms *MessageStore) Acknowledge(packetId uint16) {
+func (ms *MessageStore) Acknowledge(packetId uint16, status byte, delete bool) {
 	if cm := ms.Get(packetId); cm != nil {
-		if cm.QoS == 1 {
+		cm.Status = status
+
+		if delete {
 			ms.delete(packetId)
-		} else {
-			if cm.Status == STATUS_UNACKNOWLEDGED {
-				cm.Status = STATUS_PUBREC_RECEIVED
-			} else if cm.Status == STATUS_PUBREC_RECEIVED {
-				ms.delete(packetId)
-			}
 		}
 	}
 }

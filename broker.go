@@ -128,14 +128,16 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 			if sub.Client.connected {
 				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 				// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
-				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
+				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0) // TODO: fix retainFlag
 				if qos != 0 {
-					b.MessageStore.Store(packetId, &ClientMessage{
+					msg := &ClientMessage{
 						Topic:   topic,
 						Payload: payload,
 						QoS:     qos,
 						Client:  sub.Client,
-					})
+						Status:  STATUS_UNACKNOWLEDGED,
+					}
+					b.MessageStore.Store(packetId, msg)
 				}
 				sub.Client.emit(packet)
 			}
