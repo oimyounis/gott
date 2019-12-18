@@ -1,12 +1,13 @@
 package gott
 
-import "log"
+import (
+	"log"
+)
 
-func Recover() interface{} {
-	r := recover()
-	if r != nil {
+func Recover() {
+	if r := recover(); r != nil {
 		log.Println("Recovered from panic:", r)
-		// TODO: report panic to remote service
+		//stack := string(debug.Stack())
+		// TODO: report panic to remote service and log to file
 	}
-	return r
 }
