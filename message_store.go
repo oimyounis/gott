@@ -6,7 +6,7 @@ import (
 
 type ClientMessage struct {
 	Topic, Payload []byte
-	QoS            byte
+	QoS, Retain    byte
 	Client         *Client
 	Status         byte
 }

@@ -146,6 +146,33 @@ func (b *Broker) UnsubscribeAll(client *Client) {
 	}
 }
 
+func (b *Broker) Retain(msg *Message) {
+	if !ValidTopicName(msg.Topic) {
+		return
+	}
+
+	segs := gob.Split(msg.Topic, TOPIC_DELIM)
+
+	segsLen := len(segs)
+	if segsLen == 0 {
+		return
+	}
+
+	topLevel := segs[0]
+	tl := b.TopicFilterStorage.Find(topLevel)
+	if tl == nil {
+		tl = &TopicLevel{bytes: topLevel}
+		b.TopicFilterStorage.AddTopLevel(tl)
+	}
+
+	if segsLen == 1 {
+		tl.Retain(msg)
+		return
+	}
+
+	tl.ParseChildrenRetain(msg, segs[1:])
+}
+
 func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
 	if !ValidTopicName(topic) {
@@ -155,17 +182,43 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	matches := b.TopicFilterStorage.Match(topic)
 	log.Println(string(topic), "matches", matches)
 
+	if len(matches) == 0 {
+		if flags.Retain == 1 {
+			if len(payload) != 0 {
+				b.Retain(&Message{
+					Topic:   topic,
+					Payload: payload,
+					QoS:     flags.QoS,
+				})
+			} else {
+				b.Retain(nil)
+			}
+		}
+	}
+
 	for _, match := range matches {
+		if flags.Retain == 1 {
+			if len(payload) != 0 {
+				match.Retain(&Message{
+					Topic:   topic,
+					Payload: payload,
+					QoS:     flags.QoS,
+				})
+			} else {
+				match.Retain(nil)
+			}
+		}
 		for _, sub := range match.Subscriptions {
 			if sub.Client.connected {
 				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 				// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
-				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0) // TODO: fix retainFlag
+				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
 				if qos != 0 {
 					msg := &ClientMessage{
 						Topic:   topic,
 						Payload: payload,
 						QoS:     qos,
+						Retain:  0,
 						Client:  sub.Client,
 						Status:  STATUS_UNACKNOWLEDGED,
 					}
@@ -176,6 +229,33 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 				sub.Client.emit(packet)
 			}
 		}
+	}
+}
+
+func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
+	if msg == nil || sub == nil {
+		return
+	}
+
+	log.Println("sending retained msg", string(msg.Topic), string(msg.Payload))
+
+	if sub.Client.connected {
+		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
+		packet, packetId := MakePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
+		if qosOut != 0 {
+			msg := &ClientMessage{
+				Topic:   msg.Topic,
+				Payload: msg.Payload,
+				QoS:     qosOut,
+				Retain:  1,
+				Client:  sub.Client,
+				Status:  STATUS_UNACKNOWLEDGED,
+			}
+			b.MessageStore.Store(packetId, msg)
+
+			go Retry(packetId, msg)
+		}
+		sub.Client.emit(packet)
 	}
 }
 
@@ -197,7 +277,7 @@ func Retry(packetId uint16, msg *ClientMessage) {
 		if msg != nil && msg.Client != nil && msg.Client.connected {
 			switch msg.Status {
 			case STATUS_UNACKNOWLEDGED:
-				msg.Client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, 0)) // TODO: fix retainFlag
+				msg.Client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
 			case STATUS_PUBREC_RECEIVED:
 				packetIdBytes := make([]byte, 2)
 				binary.BigEndian.PutUint16(packetIdBytes, packetId)

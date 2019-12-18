@@ -221,7 +221,7 @@ loop:
 
 			GOTT.Publish(topic, payload, publishFlags)
 
-			// TODO: implement retention policy, also see [3.3.1.3]
+			GOTT.TopicFilterStorage.Print()
 		case TYPE_PUBACK:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -346,7 +346,6 @@ loop:
 
 			if remLen < 3 {
 				break loop
-				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
 			}
 
 			remBytes := make([]byte, remLen)
@@ -361,7 +360,6 @@ loop:
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
 				break loop
-				// TODO: handle protocol violation (See section 4.8 for information about handling errors)
 			}
 
 			filterList, err := ExtractUnSubTopicFilters(payload)

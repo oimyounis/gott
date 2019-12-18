@@ -30,6 +30,10 @@ func (tl *TopicLevel) deleteSubscription(index int) {
 	tl.Subscriptions = newSubs
 }
 
+func (tl *TopicLevel) Retain(msg *Message) {
+	tl.RetainedMessage = msg
+}
+
 func (tl *TopicLevel) AddChild(child *TopicLevel) {
 	tl.children = append(tl.children, child)
 }
@@ -58,6 +62,26 @@ func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte)
 		return
 	}
 	l.ParseChildren(client, children[1:], qos)
+}
+
+func (tl *TopicLevel) ParseChildrenRetain(msg *Message, children [][]byte) {
+	childrenLen := len(children)
+	if childrenLen == 0 {
+		return
+	}
+
+	b := children[0]
+	l := tl.Find(b)
+	if l == nil {
+		l = &TopicLevel{bytes: b, parent: tl}
+		tl.AddChild(l)
+	}
+
+	if childrenLen == 1 {
+		l.Retain(msg)
+		return
+	}
+	l.ParseChildrenRetain(msg, children[1:])
 }
 
 func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
@@ -123,14 +147,22 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	for _, sub := range tl.Subscriptions {
 		if sub.Client.ClientId == client.ClientId {
 			sub.QoS = qos
+			if tl.RetainedMessage != nil {
+				GOTT.PublishRetained(tl.RetainedMessage, sub)
+			}
 			return
 		}
 	}
 
-	tl.Subscriptions = append(tl.Subscriptions, &Subscription{
+	sub := &Subscription{
 		Client: client,
 		QoS:    qos,
-	})
+	}
+
+	tl.Subscriptions = append(tl.Subscriptions, sub)
+	if tl.RetainedMessage != nil {
+		GOTT.PublishRetained(tl.RetainedMessage, sub)
+	}
 }
 
 func (tl *TopicLevel) DeleteSubscription(client *Client) {
