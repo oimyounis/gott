@@ -87,18 +87,17 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 	return filterList, nil
 }
 
-func ExtractUnSubTopicFilters(payload []byte) ([]Filter, error) {
-	filterList := make([]Filter, 0)
+func ExtractUnSubTopicFilters(payload []byte) ([][]byte, error) {
+	filterList := make([][]byte, 0)
 	parsedBytes := 0
 	payloadLen := len(payload)
 
 	for parsedBytes < payloadLen {
 		lenBytesEnd := parsedBytes + 2
 		topicLen := int(binary.BigEndian.Uint16(payload[parsedBytes:lenBytesEnd]))
-		topicNameEnd := lenBytesEnd + topicLen
-		topicFilter := payload[lenBytesEnd:topicNameEnd]
+		topicFilter := payload[lenBytesEnd : lenBytesEnd+topicLen]
 
-		filterList = append(filterList, Filter{Filter: topicFilter}) // this should retrieve topic filters from sub list
+		filterList = append(filterList, topicFilter)
 
 		parsedBytes += topicLen + 2 // 2 bytes for topic length
 	}

@@ -44,7 +44,7 @@ loop:
 			log.Println("fixedHeader read error", err)
 			break
 		}
-		log.Println("read", fixedHeader)
+		//log.Println("read", fixedHeader)
 
 		lastByte := fixedHeader[1]
 		remLenEncoded := []byte{lastByte}
@@ -197,7 +197,7 @@ loop:
 
 			payload := remBytes[varHeaderEnd:]
 
-			log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
+			//log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
 
 			if publishFlags.QoS == 1 {
 				// return a PUBACK
@@ -239,11 +239,8 @@ loop:
 
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
-			log.Printf("1 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
-			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
 
-			log.Println("PUBACK in > packetId", packetId)
-			log.Printf("2 PUBACK in > MessageStore %#s", GOTT.MessageStore.messages)
+			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
 		case TYPE_PUBREC:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
@@ -261,13 +258,9 @@ loop:
 
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
-			log.Printf("1 PUBREC in > MessageStore %#s", GOTT.MessageStore.messages)
+
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
-
 			c.emit(MakePubRelPacket(packetIdBytes))
-
-			log.Println("PUBREC in > packetId", packetId)
-			log.Printf("2 PUBREC in > MessageStore %#s", GOTT.MessageStore.messages)
 		case TYPE_PUBREL:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
 				log.Println("malformed PUBREL packet: flags bits != 0010")
@@ -281,7 +274,7 @@ loop:
 			}
 
 			packetId := binary.BigEndian.Uint16(packetIdBytes)
-			log.Println("PUBREL in", packetIdBytes)
+
 			c.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
@@ -301,11 +294,8 @@ loop:
 
 			packetIdBytes = remBytes
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
-			log.Printf("1 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
-			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
 
-			log.Println("PUBCOMP in > packetId", packetId)
-			log.Printf("2 PUBCOMP in > MessageStore %#s", GOTT.MessageStore.messages)
+			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
 		case TYPE_SUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
@@ -324,7 +314,7 @@ loop:
 			}
 
 			packetIdBytes := remBytes[0:2]
-			packetId := binary.BigEndian.Uint16(packetIdBytes)
+			//packetId := binary.BigEndian.Uint16(packetIdBytes)
 			payload := remBytes[2:]
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
@@ -338,19 +328,16 @@ loop:
 				break loop
 			}
 
-			log.Printf("SUBSCRIBE in > id: %v - list: %#v", packetId, filterList)
-
 			// NOTE: see [MQTT-3.8.4-3] when implementing the SUB list, retention policy and server > clients publish
 
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
 
-			//go func(filterList []Filter) {
 			for _, filter := range filterList {
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
 
-			//}(filterList)
+			GOTT.TopicFilterStorage.Print()
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
@@ -369,7 +356,7 @@ loop:
 			}
 
 			packetIdBytes := remBytes[0:2]
-			packetId := binary.BigEndian.Uint16(packetIdBytes)
+			//packetId := binary.BigEndian.Uint16(packetIdBytes)
 			payload := remBytes[2:]
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
@@ -383,23 +370,25 @@ loop:
 				break loop
 			}
 
-			log.Printf("UNSUBSCRIBE in > id: %v - list: %#v", packetId, filterList)
-
-			// TODO: implement removal of sub from subs list
+			for _, filter := range filterList {
+				GOTT.Unsubscribe(c, filter)
+			}
 
 			c.emit(MakeUnSubAckPacket(packetIdBytes))
+
+			GOTT.TopicFilterStorage.Print()
 		case TYPE_PINGREQ:
-			log.Printf("PINGREQ in > %v - %v", fixedHeader, remLen)
+			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
-			// TODO: discard Will message without sending it out
+			// TODO: discard any Will Message associated with the current connection without publishing it [MQTT-3.14.4-3]
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
 			break loop
 		}
 
-		log.Printf("last packet on %v", c.lastPacketReceivedOn)
+		//log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
 	c.disconnect()
 }
@@ -408,9 +397,15 @@ func (c *Client) disconnect() {
 	if GOTT == nil {
 		return
 	}
-	// TODO: remove client from sub lists on disconnect
+
 	c.closeConnection()
 	GOTT.removeClient(c.ClientId)
+
+	log.Printf("client id %s was disconnected", c.ClientId)
+
+	GOTT.UnsubscribeAll(c)
+
+	GOTT.TopicFilterStorage.Print()
 }
 
 func (c *Client) closeConnection() {

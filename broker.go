@@ -116,6 +116,36 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	tl.ParseChildren(client, segs[1:], qos)
 }
 
+func (b *Broker) Unsubscribe(client *Client, filter []byte) {
+	if !ValidFilter(filter) {
+		return
+	}
+
+	segs := gob.Split(filter, TOPIC_DELIM)
+
+	segsLen := len(segs)
+	if segsLen == 0 {
+		return
+	}
+
+	if tl := b.TopicFilterStorage.Find(segs[0]); tl != nil {
+		if segsLen == 1 {
+			tl.DeleteSubscription(client)
+			return
+		}
+
+		tl.TraverseDelete(client, segs[1:])
+	}
+}
+
+// TODO: re-implement as this traverses the whole topic tree and all subscriptions (need to optimize this)
+func (b *Broker) UnsubscribeAll(client *Client) {
+	for _, tl := range b.TopicFilterStorage.filters {
+		tl.DeleteSubscription(client)
+		tl.TraverseDeleteAll(client)
+	}
+}
+
 func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
 	if !ValidTopicName(topic) {
@@ -153,10 +183,18 @@ func Retry(packetId uint16, msg *ClientMessage) {
 	defer Recover()
 	for {
 		time.Sleep(time.Second * 5)
-		if msg == nil {
+		if msg != nil && msg.Client != nil && msg.Client.connected {
+			switch msg.Status {
+			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
+				return
+			}
+		} else {
 			return
 		}
-		if msg.Client != nil && msg.Client.connected {
+
+		time.Sleep(time.Second * 15)
+
+		if msg != nil && msg.Client != nil && msg.Client.connected {
 			switch msg.Status {
 			case STATUS_UNACKNOWLEDGED:
 				msg.Client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, 0)) // TODO: fix retainFlag

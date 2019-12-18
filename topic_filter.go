@@ -21,6 +21,15 @@ type TopicLevel struct {
 	RetainedMessage          *Message
 }
 
+func (tl *TopicLevel) deleteSubscription(index int) {
+	var newSubs []*Subscription
+	newSubs = append(newSubs, tl.Subscriptions[:index]...)
+	if index != len(tl.Subscriptions)-1 {
+		newSubs = append(newSubs, tl.Subscriptions[index+1:]...)
+	}
+	tl.Subscriptions = newSubs
+}
+
 func (tl *TopicLevel) AddChild(child *TopicLevel) {
 	tl.children = append(tl.children, child)
 }
@@ -49,6 +58,29 @@ func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte)
 		return
 	}
 	l.ParseChildren(client, children[1:], qos)
+}
+
+func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
+	childrenLen := len(children)
+	if childrenLen == 0 {
+		return
+	}
+
+	if l := tl.Find(children[0]); l != nil {
+		if childrenLen == 1 {
+			l.DeleteSubscription(client)
+			return
+		}
+
+		l.TraverseDelete(client, children[1:])
+	}
+}
+
+func (tl *TopicLevel) TraverseDeleteAll(client *Client) {
+	for _, l := range tl.children {
+		l.DeleteSubscription(client)
+		l.TraverseDeleteAll(client)
+	}
 }
 
 func (tl *TopicLevel) Find(child []byte) *TopicLevel {
@@ -88,20 +120,10 @@ func (tl *TopicLevel) FindAll(b []byte) (matches []*TopicLevel) {
 }
 
 func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
-	for i, sub := range tl.Subscriptions {
+	for _, sub := range tl.Subscriptions {
 		if sub.Client.ClientId == client.ClientId {
-			if sub.Client.connected {
-				sub.QoS = qos
-				return
-			} else {
-				// TODO: remove clients from sub lists on disconnect
-				var newSubs []*Subscription
-				newSubs = append(newSubs, tl.Subscriptions[:i]...)
-				if i != len(tl.Subscriptions)-1 {
-					newSubs = append(newSubs, tl.Subscriptions[i+1:]...)
-				}
-				tl.Subscriptions = newSubs
-			}
+			sub.QoS = qos
+			return
 		}
 	}
 
@@ -111,8 +133,17 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	})
 }
 
+func (tl *TopicLevel) DeleteSubscription(client *Client) {
+	for i, sub := range tl.Subscriptions {
+		if sub.Client.ClientId == client.ClientId {
+			tl.deleteSubscription(i)
+			return
+		}
+	}
+}
+
 func (tl *TopicLevel) Print(add string) {
-	log.Println(add, tl.String(), "- subscriptions:", tl.SubscriptionsString())
+	fmt.Println(add, tl.String(), "- subscriptions:", tl.SubscriptionsString())
 	for _, c := range tl.children {
 		c.Print(add + indent)
 	}
@@ -193,8 +224,9 @@ func (ts *TopicStorage) FindAll(b []byte) (matches []*TopicLevel) {
 }
 
 func (ts *TopicStorage) Print() {
+	fmt.Println("Topic Tree:")
 	for _, f := range ts.filters {
-		f.Print(indent)
+		f.Print("")
 	}
 }
 
