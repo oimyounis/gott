@@ -9,20 +9,20 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - Currently implementing the MQTT v3.1.1 spec.
 
 ## Todo
-- [x] Ping (client > server).
+- [x] Ping (client -> server).
 - [x] Topic filtering with wildcards support.
 - [x] Subscriptions.
-- [x] QoS 0 message publishing.
-- [x] QoS 1 message publishing.
-- [x] QoS 2 message publishing.
-- [ ] Handle client disconnections properly.
+- [x] QoS 0 messages.
+- [x] QoS 1 messages.
+- [x] QoS 2 messages.
+- [x] Unsubscribe a client when it disconnects. (Finished but still needs optimizations)
 - [ ] Retained messages.
 - [ ] Sessions.
 - [ ] Will messages.
 - [ ] Username and password authentication.
 - [ ] Plugins.
-- [ ] MQTT v5.
 - [ ] TLS.
+- [ ] MQTT v5.
 - [ ] Clustering (maybe).
 - [ ] WebSockets.
 
@@ -37,6 +37,6 @@ You are very welcome to submit a new feature, fix a bug, an optimization to the 
 ### To Contribute:  
 Open an issue or:
 1. Fork this repo.
-2. Create a new branch with a descriptive name (example: *feature/some-new-function* or *bugfix/fix-something-somewhere*).
+2. Create a new branch with a descriptive name (example: *feature/some-new-function* or *fix/something-somewhere*).
 3. Commit and push your code to your new branch.
 4. Create a new Pull Request here.  
