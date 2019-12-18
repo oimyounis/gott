@@ -73,7 +73,9 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 		topicFilter := payload[lenBytesEnd:topicNameEnd]
 		qos := payload[topicNameEnd : topicNameEnd+1][0]
 
-		// TODO: add qos validation
+		if qos < 0 && qos > 2 {
+			return nil, errors.New("invalid QoS")
+		}
 
 		filterList = append(filterList, Filter{topicFilter, qos})
 
