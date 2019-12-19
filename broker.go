@@ -104,7 +104,7 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	topLevel := segs[0]
 	tl := b.TopicFilterStorage.Find(topLevel)
 	if tl == nil {
-		tl = &TopicLevel{bytes: topLevel}
+		tl = &TopicLevel{Bytes: topLevel}
 		b.TopicFilterStorage.AddTopLevel(tl)
 	}
 
@@ -114,6 +114,15 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	}
 
 	tl.ParseChildren(client, segs[1:], qos)
+
+	if topicNames := b.TopicFilterStorage.ReverseMatch(filter); topicNames != nil {
+		for _, name := range topicNames {
+			b.PublishRetained(name.RetainedMessage, &Subscription{
+				Client: client,
+				QoS:    qos,
+			})
+		}
+	}
 }
 
 func (b *Broker) Unsubscribe(client *Client, filter []byte) {
@@ -140,18 +149,18 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) {
 
 // TODO: re-implement as this traverses the whole topic tree and all subscriptions (need to optimize this)
 func (b *Broker) UnsubscribeAll(client *Client) {
-	for _, tl := range b.TopicFilterStorage.filters {
+	for _, tl := range b.TopicFilterStorage.Filters {
 		tl.DeleteSubscription(client)
 		tl.TraverseDeleteAll(client)
 	}
 }
 
-func (b *Broker) Retain(msg *Message) {
-	if !ValidTopicName(msg.Topic) {
+func (b *Broker) Retain(msg *Message, topic []byte) {
+	if msg != nil && !ValidTopicName(msg.Topic) {
 		return
 	}
 
-	segs := gob.Split(msg.Topic, TOPIC_DELIM)
+	segs := gob.Split(topic, TOPIC_DELIM)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -161,11 +170,11 @@ func (b *Broker) Retain(msg *Message) {
 	topLevel := segs[0]
 	tl := b.TopicFilterStorage.Find(topLevel)
 	if tl == nil {
-		tl = &TopicLevel{bytes: topLevel}
+		tl = &TopicLevel{Bytes: topLevel}
 		b.TopicFilterStorage.AddTopLevel(tl)
 	}
 
-	if segsLen == 1 {
+	if segsLen == 1 && !gob.Equal(tl.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
 		tl.Retain(msg)
 		return
 	}
@@ -182,32 +191,32 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	matches := b.TopicFilterStorage.Match(topic)
 	log.Println(string(topic), "matches", matches)
 
-	if len(matches) == 0 {
-		if flags.Retain == 1 {
-			if len(payload) != 0 {
-				b.Retain(&Message{
-					Topic:   topic,
-					Payload: payload,
-					QoS:     flags.QoS,
-				})
-			} else {
-				b.Retain(nil)
-			}
+	//if len(matches) == 0 || !FilterInSlice(topic, matches) {
+	if flags.Retain == 1 {
+		if len(payload) != 0 {
+			b.Retain(&Message{
+				Topic:   topic,
+				Payload: payload,
+				QoS:     flags.QoS,
+			}, topic)
+		} else {
+			b.Retain(nil, topic)
 		}
 	}
+	//}
 
 	for _, match := range matches {
-		if flags.Retain == 1 {
-			if len(payload) != 0 {
-				match.Retain(&Message{
-					Topic:   topic,
-					Payload: payload,
-					QoS:     flags.QoS,
-				})
-			} else {
-				match.Retain(nil)
-			}
-		}
+		//if flags.Retain == 1 {
+		//	if len(payload) != 0 {
+		//		match.Retain(&Message{
+		//			Topic:   topic,
+		//			Payload: payload,
+		//			QoS:     flags.QoS,
+		//		})
+		//	} else {
+		//		match.Retain(nil)
+		//	}
+		//}
 		for _, sub := range match.Subscriptions {
 			if sub.Client.connected {
 				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
@@ -237,7 +246,7 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 		return
 	}
 
-	log.Println("sending retained msg", string(msg.Topic), string(msg.Payload))
+	//log.Println("sending retained msg", string(msg.Topic), string(msg.Payload))
 
 	if sub.Client.connected {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))

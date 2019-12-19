@@ -4,18 +4,17 @@ import (
 	gob "bytes"
 	"fmt"
 	"gott/utils"
-	"log"
 	"strings"
 )
 
 var indent = "  "
 
 type TopicLevel struct {
-	bytes                    []byte
-	children                 []*TopicLevel
 	hasSingleWildcardAsChild bool
 	hasMultiWildcardAsChild  bool
 	parent                   *TopicLevel
+	Bytes                    []byte
+	Children                 []*TopicLevel
 	Subscriptions            []*Subscription
 	QoS                      byte
 	RetainedMessage          *Message
@@ -30,12 +29,57 @@ func (tl *TopicLevel) deleteSubscription(index int) {
 	tl.Subscriptions = newSubs
 }
 
+func (tl *TopicLevel) reverse(segs [][]byte, matches *[]*TopicLevel) {
+	if len(segs) == 0 {
+		if len(tl.Children) == 0 && !gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) && tl.RetainedMessage != nil {
+			*matches = append(*matches, tl)
+		}
+		return
+	}
+
+	seg := segs[0]
+
+	isSingleWildcard := gob.Equal(seg, TOPIC_SINGLE_LEVEL_WILDCARD)
+	isMultiWildcard := gob.Equal(seg, TOPIC_MULTI_LEVEL_WILDCARD)
+
+	if isMultiWildcard && !gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) && tl.RetainedMessage != nil {
+		*matches = append(*matches, tl)
+	}
+
+	for _, child := range tl.Children {
+		if isMultiWildcard {
+			child.reverse([][]byte{TOPIC_MULTI_LEVEL_WILDCARD}, matches)
+		} else if isSingleWildcard || gob.Equal(seg, child.Bytes) {
+			child.reverse(segs[1:], matches)
+		}
+	}
+}
+
+func (tl *TopicLevel) match(segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
+	if (len(tl.Subscriptions) != 0 || len(tl.Children) == 0) && len(segs) == 0 || (gob.Equal(tl.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) && len(tl.Children) == 0 && len(segs) == 0) || gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+		*matches = append(*matches, tl)
+		return tl
+	}
+
+	if len(tl.Children) != 0 && len(segs) != 0 {
+		if tl.hasMultiWildcardAsChild && len(segs) == 0 {
+			*matches = append(*matches, tl)
+		}
+		hits := tl.FindAll(segs[0])
+		for _, hit := range hits {
+			hit.match(segs[1:], matches)
+		}
+	}
+
+	return nil
+}
+
 func (tl *TopicLevel) Retain(msg *Message) {
 	tl.RetainedMessage = msg
 }
 
 func (tl *TopicLevel) AddChild(child *TopicLevel) {
-	tl.children = append(tl.children, child)
+	tl.Children = append(tl.Children, child)
 }
 
 func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte) {
@@ -47,7 +91,7 @@ func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte)
 	b := children[0]
 	l := tl.Find(b)
 	if l == nil {
-		l = &TopicLevel{bytes: b, parent: tl}
+		l = &TopicLevel{Bytes: b, parent: tl}
 		tl.AddChild(l)
 		if gob.Equal(b, TOPIC_SINGLE_LEVEL_WILDCARD) {
 			tl.hasSingleWildcardAsChild = true
@@ -73,11 +117,11 @@ func (tl *TopicLevel) ParseChildrenRetain(msg *Message, children [][]byte) {
 	b := children[0]
 	l := tl.Find(b)
 	if l == nil {
-		l = &TopicLevel{bytes: b, parent: tl}
+		l = &TopicLevel{Bytes: b, parent: tl}
 		tl.AddChild(l)
 	}
 
-	if childrenLen == 1 {
+	if childrenLen == 1 && !gob.Equal(l.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
 		l.Retain(msg)
 		return
 	}
@@ -101,15 +145,15 @@ func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
 }
 
 func (tl *TopicLevel) TraverseDeleteAll(client *Client) {
-	for _, l := range tl.children {
+	for _, l := range tl.Children {
 		l.DeleteSubscription(client)
 		l.TraverseDeleteAll(client)
 	}
 }
 
 func (tl *TopicLevel) Find(child []byte) *TopicLevel {
-	for _, c := range tl.children {
-		if gob.Equal(c.bytes, child) {
+	for _, c := range tl.Children {
+		if gob.Equal(c.Bytes, child) {
 			return c
 		}
 	}
@@ -121,17 +165,17 @@ func (tl *TopicLevel) FindAll(b []byte) (matches []*TopicLevel) {
 	singleWildcardFound := false
 	multiWildcardFound := false
 
-	for _, f := range tl.children {
-		if !targetFound && gob.Equal(f.bytes, b) {
+	for _, f := range tl.Children {
+		if !targetFound && gob.Equal(f.Bytes, b) {
 			matches = append(matches, f)
 			targetFound = true
 		}
-		if tl.hasSingleWildcardAsChild && !singleWildcardFound && gob.Equal(f.bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
+		if tl.hasSingleWildcardAsChild && !singleWildcardFound && gob.Equal(f.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
 			matches = append(matches, f)
 			singleWildcardFound = true
 		}
 
-		if tl.hasMultiWildcardAsChild && !multiWildcardFound && gob.Equal(f.bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+		if tl.hasMultiWildcardAsChild && !multiWildcardFound && gob.Equal(f.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
 			matches = append(matches, f)
 			multiWildcardFound = true
 		}
@@ -175,8 +219,12 @@ func (tl *TopicLevel) DeleteSubscription(client *Client) {
 }
 
 func (tl *TopicLevel) Print(add string) {
-	fmt.Println(add, tl.String(), "- subscriptions:", tl.SubscriptionsString())
-	for _, c := range tl.children {
+	retained := "NONE"
+	if tl.RetainedMessage != nil {
+		retained = string(tl.RetainedMessage.Payload)
+	}
+	fmt.Println(add, tl.String(), "- subscriptions:", tl.SubscriptionsString(), "- retained:", retained)
+	for _, c := range tl.Children {
 		c.Print(add + indent)
 	}
 }
@@ -191,7 +239,7 @@ func (tl *TopicLevel) SubscriptionsString() string {
 }
 
 func (tl *TopicLevel) Name() string {
-	return string(tl.bytes)
+	return string(tl.Bytes)
 }
 
 func (tl *TopicLevel) Path() string {
@@ -206,23 +254,23 @@ func (tl *TopicLevel) String() string {
 }
 
 type TopicStorage struct {
-	filters              []*TopicLevel
+	Filters              []*TopicLevel
 	hasGlobalFilter      bool // has "#"
 	hasTopSingleWildcard bool // has "+" as top level
 }
 
 func (ts *TopicStorage) AddTopLevel(tl *TopicLevel) {
-	ts.filters = append(ts.filters, tl)
-	if gob.Equal(tl.bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+	ts.Filters = append(ts.Filters, tl)
+	if gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
 		ts.hasGlobalFilter = true
-	} else if gob.Equal(tl.bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
+	} else if gob.Equal(tl.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
 		ts.hasTopSingleWildcard = true
 	}
 }
 
 func (ts *TopicStorage) Find(b []byte) *TopicLevel {
-	for _, f := range ts.filters {
-		if gob.Equal(f.bytes, b) {
+	for _, f := range ts.Filters {
+		if gob.Equal(f.Bytes, b) {
 			return f
 		}
 	}
@@ -234,16 +282,16 @@ func (ts *TopicStorage) FindAll(b []byte) (matches []*TopicLevel) {
 	globalFilterFound := false
 	topSingleWildcardFound := false
 
-	for _, f := range ts.filters {
-		if !targetFound && gob.Equal(f.bytes, b) {
+	for _, f := range ts.Filters {
+		if !targetFound && gob.Equal(f.Bytes, b) {
 			matches = append(matches, f)
 			targetFound = true
 		}
-		if ts.hasGlobalFilter && !globalFilterFound && gob.Equal(f.bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+		if ts.hasGlobalFilter && !globalFilterFound && gob.Equal(f.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
 			matches = append(matches, f)
 			globalFilterFound = true
 		}
-		if ts.hasTopSingleWildcard && !topSingleWildcardFound && gob.Equal(f.bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
+		if ts.hasTopSingleWildcard && !topSingleWildcardFound && gob.Equal(f.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
 			matches = append(matches, f)
 			topSingleWildcardFound = true
 		}
@@ -257,7 +305,7 @@ func (ts *TopicStorage) FindAll(b []byte) (matches []*TopicLevel) {
 
 func (ts *TopicStorage) Print() {
 	fmt.Println("Topic Tree:")
-	for _, f := range ts.filters {
+	for _, f := range ts.Filters {
 		f.Print("")
 	}
 }
@@ -269,32 +317,40 @@ func (ts *TopicStorage) Match(topic []byte) []*TopicLevel {
 
 	hits := ts.FindAll(segs[0])
 
-	log.Printf("hits: %s", hits)
+	//log.Printf("hits: %s", hits)
 
 	for _, hit := range hits {
-		match(hit, segs[1:], &matches)
+		hit.match(segs[1:], &matches)
 	}
 
 	return matches
 }
 
-func match(t *TopicLevel, segs [][]byte, matches *[]*TopicLevel) *TopicLevel {
-	if (len(t.Subscriptions) != 0 || len(t.children) == 0) && len(segs) == 0 || (gob.Equal(t.bytes, TOPIC_SINGLE_LEVEL_WILDCARD) && len(t.children) == 0 && len(segs) == 0) || gob.Equal(t.bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
-		*matches = append(*matches, t)
-		return t
+func (ts *TopicStorage) ReverseMatch(filter []byte) []*TopicLevel {
+	if !utils.ByteInSlice(TOPIC_SINGLE_LEVEL_WILDCARD[0], filter) && !utils.ByteInSlice(TOPIC_MULTI_LEVEL_WILDCARD[0], filter) {
+		return nil
 	}
 
-	if len(t.children) != 0 && len(segs) != 0 {
-		if t.hasMultiWildcardAsChild && len(segs) == 0 {
-			*matches = append(*matches, t)
-		}
-		hits := t.FindAll(segs[0])
-		for _, hit := range hits {
-			match(hit, segs[1:], matches)
+	segs := gob.Split(filter, TOPIC_DELIM)
+	segsLen := len(segs)
+
+	var matches []*TopicLevel
+
+	topLevel := segs[0]
+	isSingleWildcard := gob.Equal(topLevel, TOPIC_SINGLE_LEVEL_WILDCARD)
+	isMultiWildcard := gob.Equal(topLevel, TOPIC_MULTI_LEVEL_WILDCARD)
+
+	for _, level := range ts.Filters {
+		if segsLen == 1 && isSingleWildcard && level.RetainedMessage != nil {
+			matches = append(matches, level)
+		} else if (isSingleWildcard && !gob.Equal(level.Bytes, TOPIC_MULTI_LEVEL_WILDCARD)) || gob.Equal(topLevel, level.Bytes) && !gob.Equal(level.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+			level.reverse(segs[1:], &matches)
+		} else if isMultiWildcard {
+			level.reverse([][]byte{topLevel}, &matches)
 		}
 	}
 
-	return nil
+	return matches
 }
 
 func ValidFilter(filter []byte) bool {
