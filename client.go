@@ -336,8 +336,6 @@ loop:
 			for _, filter := range filterList {
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
-
-			GOTT.TopicFilterStorage.Print()
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
@@ -373,8 +371,6 @@ loop:
 			}
 
 			c.emit(MakeUnSubAckPacket(packetIdBytes))
-
-			GOTT.TopicFilterStorage.Print()
 		case TYPE_PINGREQ:
 			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
@@ -411,16 +407,9 @@ func (c *Client) closeConnection() {
 	_ = c.connection.Close()
 }
 
-func (c *Client) publish(topicName, payload []byte, dup, qos, retain byte) {
-	if qos == 0 {
-		dup = 0
-	}
-	MakePublishPacket(topicName, payload, dup, qos, retain)
-}
-
 func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
-	log.Println("emit out <", c.ClientId, packet)
+	//log.Println("emit out <", c.ClientId, packet)
 }
