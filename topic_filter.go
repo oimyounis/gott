@@ -31,7 +31,7 @@ func (tl *TopicLevel) deleteSubscription(index int) {
 
 func (tl *TopicLevel) reverse(segs [][]byte, matches *[]*TopicLevel) {
 	if len(segs) == 0 {
-		if len(tl.Children) == 0 && !gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) && tl.RetainedMessage != nil {
+		if !gob.Equal(tl.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) && tl.RetainedMessage != nil {
 			*matches = append(*matches, tl)
 		}
 		return
@@ -191,9 +191,9 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	for _, sub := range tl.Subscriptions {
 		if sub.Client.ClientId == client.ClientId {
 			sub.QoS = qos
-			if tl.RetainedMessage != nil {
-				GOTT.PublishRetained(tl.RetainedMessage, sub)
-			}
+			//if tl.RetainedMessage != nil {
+			//	GOTT.PublishRetained(tl.RetainedMessage, sub)
+			//}
 			return
 		}
 	}
@@ -204,9 +204,9 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	}
 
 	tl.Subscriptions = append(tl.Subscriptions, sub)
-	if tl.RetainedMessage != nil {
-		GOTT.PublishRetained(tl.RetainedMessage, sub)
-	}
+	//if tl.RetainedMessage != nil {
+	//	GOTT.PublishRetained(tl.RetainedMessage, sub)
+	//}
 }
 
 func (tl *TopicLevel) DeleteSubscription(client *Client) {
@@ -327,9 +327,9 @@ func (ts *TopicStorage) Match(topic []byte) []*TopicLevel {
 }
 
 func (ts *TopicStorage) ReverseMatch(filter []byte) []*TopicLevel {
-	if !utils.ByteInSlice(TOPIC_SINGLE_LEVEL_WILDCARD[0], filter) && !utils.ByteInSlice(TOPIC_MULTI_LEVEL_WILDCARD[0], filter) {
-		return nil
-	}
+	//if !utils.ByteInSlice(TOPIC_SINGLE_LEVEL_WILDCARD[0], filter) && !utils.ByteInSlice(TOPIC_MULTI_LEVEL_WILDCARD[0], filter) {
+	//return nil
+	//}
 
 	segs := gob.Split(filter, TOPIC_DELIM)
 	segsLen := len(segs)
@@ -343,7 +343,7 @@ func (ts *TopicStorage) ReverseMatch(filter []byte) []*TopicLevel {
 	for _, level := range ts.Filters {
 		if segsLen == 1 && isSingleWildcard && level.RetainedMessage != nil {
 			matches = append(matches, level)
-		} else if (isSingleWildcard && !gob.Equal(level.Bytes, TOPIC_MULTI_LEVEL_WILDCARD)) || gob.Equal(topLevel, level.Bytes) && !gob.Equal(level.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
+		} else if (isSingleWildcard || gob.Equal(topLevel, level.Bytes)) && !gob.Equal(level.Bytes, TOPIC_MULTI_LEVEL_WILDCARD) {
 			level.reverse(segs[1:], &matches)
 		} else if isMultiWildcard {
 			level.reverse([][]byte{topLevel}, &matches)

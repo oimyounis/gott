@@ -398,8 +398,6 @@ func (c *Client) disconnect() {
 	log.Printf("client id %s was disconnected", c.ClientId)
 
 	GOTT.UnsubscribeAll(c)
-
-	GOTT.TopicFilterStorage.Print()
 }
 
 func (c *Client) closeConnection() {

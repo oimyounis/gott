@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"sort"
 	"sync"
 	"time"
 )
@@ -116,8 +117,12 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	tl.ParseChildren(client, segs[1:], qos)
 
 	if topicNames := b.TopicFilterStorage.ReverseMatch(filter); topicNames != nil {
-		for _, name := range topicNames {
-			b.PublishRetained(name.RetainedMessage, &Subscription{
+		sort.SliceStable(topicNames, func(i, j int) bool { // spec REQUIRES topics to be "Ordered" by default
+			return topicNames[i].RetainedMessage.Timestamp.Before(topicNames[j].RetainedMessage.Timestamp)
+		})
+
+		for _, topic := range topicNames {
+			b.PublishRetained(topic.RetainedMessage, &Subscription{
 				Client: client,
 				QoS:    qos,
 			})
@@ -195,9 +200,10 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	if flags.Retain == 1 {
 		if len(payload) != 0 {
 			b.Retain(&Message{
-				Topic:   topic,
-				Payload: payload,
-				QoS:     flags.QoS,
+				Topic:     topic,
+				Payload:   payload,
+				QoS:       flags.QoS,
+				Timestamp: time.Now(),
 			}, topic)
 		} else {
 			b.Retain(nil, topic)
