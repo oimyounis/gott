@@ -18,7 +18,7 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] QoS 2 messages
 - [x] Unsubscribe a client when it disconnects (finished but still needs optimizations)
 - [x] Retained messages
-- [ ] Will messages
+- [x] Will messages
 - [ ] Username and password authentication
 - [ ] Sessions
 - [ ] Plugins
@@ -30,7 +30,8 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [ ] WebSockets
 
 ## Installation
-Just clone/download this repo and build/run `main/main.go`.
+1. Run `go get -u github.com/google/uuid`.
+2. Clone/download this repo and build/run `main/main.go`.
 
 ## License
 Apache License 2.0, see LICENSE.
