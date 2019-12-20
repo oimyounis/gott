@@ -27,7 +27,11 @@ func (c *Client) listen() {
 		return
 	}
 
-	defer Recover()
+	defer Recover(func(c *Client) func(string, string) {
+		return func(err, stack string) {
+			c.disconnect()
+		}
+	}(c))
 
 	sockBuffer := bufio.NewReader(c.connection)
 
