@@ -21,6 +21,7 @@ type Client struct {
 	ClientId             string
 	MessageStore         *MessageStore
 	WillMessage          *Message
+	Username, Password   string
 }
 
 func (c *Client) listen() {
@@ -179,13 +180,48 @@ loop:
 				log.Println("will:", string(c.WillMessage.Topic), "-", string(c.WillMessage.Payload))
 			}
 
-			// TODO: verify payload with flags (Client Identifier, Will Topic, Will Message, User Name, Password)
+			if connFlags.UserNameFlag == "1" {
+				usernameLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
+				head += 2
+				if usernameLen == 0 {
+					break loop
+				}
+				username := payload[head : head+usernameLen]
+				head += usernameLen
+				if len(username) == 0 {
+					break loop
+				}
+				c.Username = string(username)
+
+				log.Println("username:", c.Username)
+			}
+
+			if connFlags.PasswordFlag == "1" {
+				passwordLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
+				head += 2
+				if passwordLen == 0 {
+					break loop
+				}
+				password := payload[head : head+passwordLen]
+				head += passwordLen
+				if len(password) == 0 {
+					break loop
+				}
+				c.Password = string(password)
+
+				log.Println("password:", c.Password)
+			}
+
+			if c.Username != "" { // for testing only, should be implemented as a plugin
+				if auth := c.authenticate(); !auth {
+					c.emit(MakeConnAckPacket(0, CONNECT_NOT_AUTHORIZED))
+					break loop
+				}
+			}
 
 			// TODO: implement Session
-			// TODO: implement Will [3.1.3]
 
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
-			// TODO: implement username and password auth [3.1.3]
 
 			// connection succeeded
 			log.Println("client connected with id:", c.ClientId)
@@ -454,4 +490,12 @@ func (c *Client) emit(packet []byte) {
 		log.Println("error sending packet", err, packet)
 	}
 	//log.Println("emit out <", c.ClientId, packet)
+}
+
+// For test purposes only
+func (c *Client) authenticate() bool { // TODO: implement authentication as a plugin
+	if c.Username == "testuser" && c.Password == "testpass" {
+		return true
+	}
+	return false
 }
