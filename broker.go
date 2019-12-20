@@ -224,7 +224,7 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 		//	}
 		//}
 		for _, sub := range match.Subscriptions {
-			if sub.Client.connected {
+			if sub.Client != nil && sub.Client.connected {
 				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 				// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
 				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
@@ -275,7 +275,7 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 }
 
 func Retry(packetId uint16, msg *ClientMessage) {
-	defer Recover()
+	defer Recover(nil)
 	for {
 		time.Sleep(time.Second * 5)
 		if msg != nil && msg.Client != nil && msg.Client.connected {

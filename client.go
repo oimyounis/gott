@@ -20,6 +20,7 @@ type Client struct {
 	lastPacketReceivedOn time.Time
 	ClientId             string
 	MessageStore         *MessageStore
+	WillMessage          *Message
 }
 
 func (c *Client) listen() {
@@ -126,8 +127,11 @@ loop:
 			}
 			//log.Println("payload", payload)
 
+			head := 0
+
 			// client id parsing
-			clientIdLen := int(binary.BigEndian.Uint16(payload[0:2])) // maximum client ID length is 65535 bytes
+			clientIdLen := int(binary.BigEndian.Uint16(payload[head:2])) // maximum client ID length is 65535 bytes
+			head += 2
 			if clientIdLen == 0 {
 				if connFlags.CleanSession == "0" {
 					log.Println("connect error: received zero byte client id with clean session flag set to 0")
@@ -140,7 +144,39 @@ loop:
 					log.Println("malformed packet: payload length is not valid")
 					break loop
 				}
-				c.ClientId = string(payload[2 : 2+clientIdLen])
+				c.ClientId = string(payload[head : head+clientIdLen])
+				head += clientIdLen
+			}
+
+			if connFlags.WillFlag == "1" {
+				willTopicLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
+				head += 2
+				if willTopicLen == 0 {
+					break loop
+				}
+				willTopic := payload[head : head+willTopicLen]
+				head += willTopicLen
+				if len(willTopic) == 0 {
+					break loop
+				}
+
+				willPayloadLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
+				head += 2
+				if willPayloadLen == 0 {
+					break loop
+				}
+				willPayload := payload[head : head+willPayloadLen]
+				head += willPayloadLen
+				if len(willPayload) == 0 {
+					break loop
+				}
+
+				c.WillMessage = &Message{
+					Topic:   willTopic,
+					Payload: willPayload,
+				}
+
+				log.Println("will:", string(c.WillMessage.Topic), "-", string(c.WillMessage.Payload))
 			}
 
 			// TODO: verify payload with flags (Client Identifier, Will Topic, Will Message, User Name, Password)
@@ -379,7 +415,7 @@ loop:
 			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
-			// TODO: discard any Will Message associated with the current connection without publishing it [MQTT-3.14.4-3]
+			c.WillMessage = nil
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
@@ -402,6 +438,10 @@ func (c *Client) disconnect() {
 	log.Printf("client id %s was disconnected", c.ClientId)
 
 	GOTT.UnsubscribeAll(c)
+
+	if c.WillMessage != nil {
+		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, PublishFlags{})
+	}
 }
 
 func (c *Client) closeConnection() {

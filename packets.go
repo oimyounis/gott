@@ -74,7 +74,7 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
 	varHeader = append(varHeader, topic...)
 
-	if qos >= 1 {
+	if qos > 0 {
 		varHeader = append(varHeader, 0, 0)
 		packetId = uint16(packetSeq.Next())
 		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetId)
