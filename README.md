@@ -19,7 +19,6 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] Unsubscribe a client when it disconnects (finished but still needs optimizations)
 - [x] Retained messages
 - [x] Will messages
-- [ ] Username and password authentication
 - [ ] Sessions
 - [ ] Plugins
 
