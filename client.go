@@ -19,9 +19,9 @@ type Client struct {
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
 	ClientId             string
-	MessageStore         *MessageStore
 	WillMessage          *Message
 	Username, Password   string
+	Session              *Session
 }
 
 func (c *Client) listen() {
@@ -219,14 +219,24 @@ loop:
 				}
 			}
 
-			// TODO: implement Session
+			var sessionPresent byte
+
+			if connFlags.CleanSession == "1" {
+				_ = GOTT.SessionStore.Delete(c.ClientId)
+			} else {
+				if GOTT.SessionStore.Exists(c.ClientId) {
+					sessionPresent = 1
+				}
+			}
+
+			c.Session = NewSession(c, connFlags.CleanSession)
 
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
 			log.Println("client connected with id:", c.ClientId)
 			GOTT.addClient(c)
-			c.emit(MakeConnAckPacket(0, CONNECT_ACCEPTED)) // TODO: fix sessionPresent after implementing sessions
+			c.emit(MakeConnAckPacket(sessionPresent, CONNECT_ACCEPTED))
 		case TYPE_PUBLISH:
 			publishFlags, err := ExtractPublishFlags(flagsBits)
 			if err != nil {
@@ -281,12 +291,12 @@ loop:
 			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
 				if publishFlags.DUP == 1 {
-					if msg := c.MessageStore.Get(packetId); msg != nil {
+					if msg := c.Session.MessageStore.Get(packetId); msg != nil {
 						c.emit(MakePubRecPacket(packetIdBytes))
 						break // skip resending message
 					}
 				}
-				c.MessageStore.Store(packetId, &ClientMessage{
+				c.Session.MessageStore.Store(packetId, &ClientMessage{
 					Topic:   topic,
 					Payload: payload,
 					QoS:     publishFlags.QoS,
@@ -351,7 +361,7 @@ loop:
 
 			packetId := binary.BigEndian.Uint16(packetIdBytes)
 
-			c.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
+			c.Session.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
 			if remLen != 2 {

@@ -25,9 +25,10 @@ type Broker struct {
 	mutex              sync.RWMutex
 	TopicFilterStorage *TopicStorage
 	MessageStore       *MessageStore
+	SessionStore       *SessionStore
 }
 
-func NewBroker(address string) *Broker {
+func NewBroker(address string) (*Broker, error) {
 	GOTT = &Broker{
 		address:            address,
 		listener:           nil,
@@ -35,7 +36,14 @@ func NewBroker(address string) *Broker {
 		TopicFilterStorage: &TopicStorage{},
 		MessageStore:       NewMessageStore(),
 	}
-	return GOTT
+
+	ss, err := LoadSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	GOTT.SessionStore = ss
+
+	return GOTT, nil
 }
 
 func (b *Broker) Listen() error {
@@ -83,9 +91,8 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 	//client := b.addClient(conn)
 	c := &Client{
-		connection:   conn,
-		connected:    true,
-		MessageStore: NewMessageStore(),
+		connection: conn,
+		connected:  true,
 	}
 	go c.listen()
 }
@@ -234,7 +241,7 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 						Payload: payload,
 						QoS:     qos,
 						Retain:  0,
-						Client:  sub.Client,
+						client:  sub.Client,
 						Status:  STATUS_UNACKNOWLEDGED,
 					}
 					b.MessageStore.Store(packetId, msg)
@@ -263,7 +270,7 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 				Payload: msg.Payload,
 				QoS:     qosOut,
 				Retain:  1,
-				Client:  sub.Client,
+				client:  sub.Client,
 				Status:  STATUS_UNACKNOWLEDGED,
 			}
 			b.MessageStore.Store(packetId, msg)
@@ -278,7 +285,7 @@ func Retry(packetId uint16, msg *ClientMessage) {
 	defer Recover(nil)
 	for {
 		time.Sleep(time.Second * 5)
-		if msg != nil && msg.Client != nil && msg.Client.connected {
+		if msg != nil && msg.client != nil && msg.client.connected {
 			switch msg.Status {
 			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
 				return
@@ -289,18 +296,18 @@ func Retry(packetId uint16, msg *ClientMessage) {
 
 		time.Sleep(time.Second * 15)
 
-		if msg != nil && msg.Client != nil && msg.Client.connected {
+		if msg != nil && msg.client != nil && msg.client.connected {
 			switch msg.Status {
 			case STATUS_UNACKNOWLEDGED:
-				msg.Client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
+				msg.client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
 			case STATUS_PUBREC_RECEIVED:
 				packetIdBytes := make([]byte, 2)
 				binary.BigEndian.PutUint16(packetIdBytes, packetId)
-				msg.Client.emit(MakePubRelPacket(packetIdBytes))
+				msg.client.emit(MakePubRelPacket(packetIdBytes))
 			case STATUS_PUBREL_RECEIVED:
 				packetIdBytes := make([]byte, 2)
 				binary.BigEndian.PutUint16(packetIdBytes, packetId)
-				msg.Client.emit(MakePubCompPacket(packetIdBytes))
+				msg.client.emit(MakePubCompPacket(packetIdBytes))
 			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
 				return
 			}
