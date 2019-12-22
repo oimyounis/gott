@@ -16,3 +16,7 @@ func BinaryStringToByte(bs string) (byte, error) {
 	}
 	return byte(i), nil
 }
+
+func BitIsSet(b, bit byte) bool {
+	return (1<<bit)&b != 0
+}
