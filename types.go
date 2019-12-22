@@ -3,12 +3,14 @@ package gott
 import "time"
 
 type ConnectFlags struct {
-	Reserved, CleanSession, WillFlag, WillQOS, WillRetain, PasswordFlag, UserNameFlag string
+	CleanSession, WillFlag, WillRetain, PasswordFlag, UserNameFlag bool
+	WillQoS                                                        byte
 }
 
 type PublishFlags struct {
-	DUP, QoS, Retain byte
-	PacketId         uint16
+	DUP, QoS byte
+	Retain   bool
+	PacketId uint16
 }
 
 type Filter struct {
@@ -24,7 +26,8 @@ type Subscription struct {
 type Message struct {
 	Topic, Payload []byte
 	QoS            byte
-	Timestamp      time.Time // used for sorting retained messages in the order they where received (less is first)
+	Retain         bool
+	Timestamp      time.Time // used for sorting retained messages in the order they were received (less is first)
 }
 
 type PacketStatus struct {

@@ -6,23 +6,50 @@ import (
 	"gott/bytes"
 )
 
-func ExtractConnectFlags(bits string) ConnectFlags {
-	return ConnectFlags{
-		Reserved:     bits[7:],
-		CleanSession: bits[6:7],
-		WillFlag:     bits[5:6],
-		WillQOS:      bits[3:5],
-		WillRetain:   bits[2:3],
-		PasswordFlag: bits[1:2],
-		UserNameFlag: bits[0:1],
+var noopConnectFlags = ConnectFlags{}
+
+func ExtractConnectFlags(b byte) (ConnectFlags, error) {
+	var willQos byte
+	qosBit3 := bytes.BitIsSet(b, 3)
+	qosBit4 := bytes.BitIsSet(b, 4)
+	willFlag := bytes.BitIsSet(b, 2)
+	willRetain := bytes.BitIsSet(b, 5)
+	reservedBit := bytes.BitIsSet(b, 0)
+
+	if reservedBit { // as per [MQTT-3.1.2-3]
+		return noopConnectFlags, errors.New("reserved bit is set in connect flag bits")
 	}
+
+	if qosBit3 && qosBit4 {
+		return noopConnectFlags, errors.New("invalid QoS in connect flag bits")
+	} else if qosBit3 {
+		willQos = 1
+	} else if qosBit4 {
+		willQos = 2
+	}
+
+	if !willFlag && willQos != 0 {
+		return noopConnectFlags, errors.New("will flag is set to 0 and will QoS is not 0")
+	}
+	if !willFlag && willRetain {
+		return noopConnectFlags, errors.New("will flag is set to 0 and will retain is not 0")
+	}
+	return ConnectFlags{
+		CleanSession: bytes.BitIsSet(b, 1),
+		WillFlag:     willFlag,
+		WillQoS:      willQos,
+		WillRetain:   willRetain,
+		PasswordFlag: bytes.BitIsSet(b, 6),
+		UserNameFlag: bytes.BitIsSet(b, 7),
+	}, nil
 }
 
-var noopFlags = PublishFlags{}
+var noopPublishFlags = PublishFlags{}
 
 func ExtractPublishFlags(bits string) (PublishFlags, error) {
 	var (
-		qos, dup, retain byte
+		qos, dup byte
+		retain   bool
 	)
 
 	switch bits[1:3] {
@@ -33,16 +60,16 @@ func ExtractPublishFlags(bits string) (PublishFlags, error) {
 	case "10":
 		qos = 2
 	default:
-		return noopFlags, errors.New("invalid flags in publish packet")
+		return noopPublishFlags, errors.New("invalid flags in publish packet")
 	}
 
 	switch bits[3:] {
 	case "0":
-		retain = 0
+		retain = false
 	case "1":
-		retain = 1
+		retain = true
 	default:
-		return noopFlags, errors.New("invalid flags in publish packet")
+		return noopPublishFlags, errors.New("invalid flags in publish packet")
 	}
 
 	switch bits[0:1] {
@@ -51,7 +78,7 @@ func ExtractPublishFlags(bits string) (PublishFlags, error) {
 	case "1":
 		dup = 1
 	default:
-		return noopFlags, errors.New("invalid flags in publish packet")
+		return noopPublishFlags, errors.New("invalid flags in publish packet")
 	}
 
 	return PublishFlags{

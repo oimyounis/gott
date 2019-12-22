@@ -16,6 +16,7 @@ var (
 	SUPPORTED_PROTOCOL_VERSIONS = []byte{4}
 )
 
+// this is done to save memory instead of keeping a reference inside each Client
 var GOTT *Broker
 
 type Broker struct {
@@ -197,7 +198,7 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	log.Println(string(topic), "matches", matches)
 
 	//if len(matches) == 0 || !FilterInSlice(topic, matches) {
-	if flags.Retain == 1 {
+	if flags.Retain {
 		if len(payload) != 0 {
 			b.Retain(&Message{
 				Topic:     topic,
