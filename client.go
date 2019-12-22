@@ -111,10 +111,9 @@ loop:
 				break loop
 			}
 
-			flagsBits := bytes.ByteToBinaryString(varHeader[7])
-			connFlags := ExtractConnectFlags(flagsBits)
-			if connFlags.Reserved != "0" {
-				log.Println("malformed packet: reserved flag in CONNECT packet header is not zero", flagsBits[7:8])
+			connFlags, err := ExtractConnectFlags(varHeader[7])
+			if err != nil {
+				log.Println("malformed packet: ", err)
 				break loop
 			}
 
@@ -134,14 +133,14 @@ loop:
 			clientIdLen := int(binary.BigEndian.Uint16(payload[head:2])) // maximum client ID length is 65535 bytes
 			head += 2
 			if clientIdLen == 0 {
-				if connFlags.CleanSession == "0" {
+				if !connFlags.CleanSession {
 					log.Println("connect error: received zero byte client id with clean session flag set to 0")
 					c.emit(MakeConnAckPacket(0, CONNECT_ID_REJECTED))
 					break loop
 				}
 				c.ClientId = uuid.New().String()
 			} else {
-				if len(payload) < 2+clientIdLen {
+				if payloadLen < 2+clientIdLen {
 					log.Println("malformed packet: payload length is not valid")
 					break loop
 				}
@@ -149,7 +148,7 @@ loop:
 				head += clientIdLen
 			}
 
-			if connFlags.WillFlag == "1" {
+			if connFlags.WillFlag {
 				willTopicLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
 				head += 2
 				if willTopicLen == 0 {
@@ -175,15 +174,25 @@ loop:
 				c.WillMessage = &Message{
 					Topic:   willTopic,
 					Payload: willPayload,
+					QoS:     connFlags.WillQoS,
+					Retain:  connFlags.WillRetain,
 				}
 
-				log.Println("will:", string(c.WillMessage.Topic), "-", string(c.WillMessage.Payload))
+				log.Println("will:", string(c.WillMessage.Topic), "-", string(c.WillMessage.Payload), "-", c.WillMessage.QoS, "-", c.WillMessage.Retain)
 			}
 
-			if connFlags.UserNameFlag == "1" {
+			if connFlags.UserNameFlag {
+				if payloadLen < head+2 {
+					log.Println("malformed packet: payload length is not valid")
+					break loop
+				}
 				usernameLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
 				head += 2
 				if usernameLen == 0 {
+					break loop
+				}
+				if payloadLen < head+usernameLen {
+					log.Println("malformed packet: payload length is not valid")
 					break loop
 				}
 				username := payload[head : head+usernameLen]
@@ -196,10 +205,18 @@ loop:
 				log.Println("username:", c.Username)
 			}
 
-			if connFlags.PasswordFlag == "1" {
+			if connFlags.PasswordFlag {
+				if payloadLen < head+2 {
+					log.Println("malformed packet: payload length is not valid")
+					break loop
+				}
 				passwordLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
 				head += 2
 				if passwordLen == 0 {
+					break loop
+				}
+				if payloadLen < head+passwordLen {
+					log.Println("malformed packet: payload length is not valid")
 					break loop
 				}
 				password := payload[head : head+passwordLen]
@@ -476,7 +493,11 @@ func (c *Client) disconnect() {
 	GOTT.UnsubscribeAll(c)
 
 	if c.WillMessage != nil {
-		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, PublishFlags{})
+		// TODO: see [MQTT-3.1.2-10] after implementing sessions
+		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, PublishFlags{
+			Retain: c.WillMessage.Retain,
+			QoS:    c.WillMessage.QoS,
+		})
 	}
 }
 
