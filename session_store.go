@@ -5,44 +5,6 @@ import (
 	js "github.com/json-iterator/go"
 )
 
-type Session struct {
-	client       *Client
-	MessageStore *MessageStore
-	clean        bool
-}
-
-func NewSession(client *Client, cleanFlag string) *Session {
-	return &Session{
-		client:       client,
-		MessageStore: NewMessageStore(),
-		clean:        cleanFlag == "1",
-	}
-}
-
-func (s *Session) Get() (map[string]interface{}, error) {
-	return GOTT.SessionStore.Get(s.client.ClientId)
-}
-
-func (s *Session) Update(value map[string]interface{}) error {
-	return GOTT.SessionStore.Set(s.client.ClientId, value)
-}
-
-func (s *Session) Put() error {
-	return GOTT.SessionStore.Set(s.client.ClientId, s)
-}
-
-func (s *Session) Client() *Client {
-	return s.client
-}
-
-func (s *Session) Clean() bool {
-	return s.clean
-}
-
-//func (s *Session) Put() error {
-//	return GOTT.SessionStore.Set(s.Client.ClientId, s.MessageStore)
-//}
-
 type SessionStore struct {
 	*badger.DB
 }
@@ -59,42 +21,24 @@ func LoadSessionStore() (*SessionStore, error) {
 	return &SessionStore{db}, nil
 }
 
-func (ss *SessionStore) Get(key string) (map[string]interface{}, error) {
-	data := map[string]interface{}{}
-
-	err := ss.View(func(txn *badger.Txn) error {
+func (ss *SessionStore) Get(key string, out *Session) error {
+	return ss.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
 		if err != nil {
 			return err
 		}
 
-		err = item.Value(func(val []byte) error {
-			err := js.Unmarshal(val, &data)
-
-			return err
+		return item.Value(func(val []byte) error {
+			return js.Unmarshal(val, out)
 		})
-
-		return err
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 func (ss *SessionStore) Exists(key string) bool {
-	err := ss.View(func(txn *badger.Txn) error {
+	return ss.View(func(txn *badger.Txn) error {
 		_, err := txn.Get([]byte(key))
 		return err
-	})
-
-	if err != nil {
-		return false
-	}
-
-	return true
+	}) == nil
 }
 
 func (ss *SessionStore) Set(key string, value interface{}) error {
@@ -136,7 +80,5 @@ func set(txn *badger.Txn, key string, value interface{}) error {
 		return nil
 	}
 
-	err = txn.Set([]byte(key), valJson)
-
-	return err
+	return txn.Set([]byte(key), valJson)
 }
