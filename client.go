@@ -221,15 +221,24 @@ loop:
 
 			var sessionPresent byte
 
+			c.Session = NewSession(c, connFlags.CleanSession)
+
 			if connFlags.CleanSession == "1" {
 				_ = GOTT.SessionStore.Delete(c.ClientId)
+			} else if GOTT.SessionStore.Exists(c.ClientId) {
+				sessionPresent = 1
+				if err := c.Session.Load(); err != nil {
+					// try to delete stored session in case it was malformed
+					_ = GOTT.SessionStore.Delete(c.ClientId)
+				}
+
+				log.Printf("session for id: %s, session: %#v", c.ClientId, c.Session)
 			} else {
-				if GOTT.SessionStore.Exists(c.ClientId) {
-					sessionPresent = 1
+				if err := c.Session.Put(); err != nil {
+					log.Println("error putting session to store:", err)
+					break loop
 				}
 			}
-
-			c.Session = NewSession(c, connFlags.CleanSession)
 
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
