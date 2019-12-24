@@ -90,15 +90,17 @@ func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte)
 
 	b := children[0]
 	l := tl.Find(b)
+
 	if l == nil {
 		l = &TopicLevel{Bytes: b, parent: tl}
 		tl.AddChild(l)
-		if gob.Equal(b, TOPIC_SINGLE_LEVEL_WILDCARD) {
-			tl.hasSingleWildcardAsChild = true
-		} else if gob.Equal(b, TOPIC_MULTI_LEVEL_WILDCARD) {
-			tl.hasMultiWildcardAsChild = true
-			tl.CreateOrUpdateSubscription(client, qos)
-		}
+	}
+
+	if gob.Equal(b, TOPIC_SINGLE_LEVEL_WILDCARD) {
+		tl.hasSingleWildcardAsChild = true
+	} else if gob.Equal(b, TOPIC_MULTI_LEVEL_WILDCARD) {
+		tl.hasMultiWildcardAsChild = true
+		tl.CreateOrUpdateSubscription(client, qos)
 	}
 
 	if childrenLen == 1 {
