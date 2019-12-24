@@ -22,15 +22,20 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [ ] Sessions
 - [ ] Plugins
 
-### Planned for v2
+## Planned for v2
 - [ ] MQTT v5
 - [ ] TLS
 - [ ] Clustering (maybe)
 - [ ] WebSockets
 
+## Known Issues
+- Restarting the broker will reset existing subscriptions. They are not saved to disk (sessions are saved to disk but subscriptions are not restored on broker restart).
+
 ## Installation
-1. Run `go get -u github.com/google/uuid`.
-2. Clone/download this repo and build/run `main/main.go`.
+1. Run `go get -u github.com/google/uuid`
+2. Run `go get -u github.com/dgraph-io/badger`
+3. Run `go get -u github.com/json-iterator/go`
+4. Clone/download this repo and build/run `main/main.go`
 
 ## License
 Apache License 2.0, see LICENSE.
