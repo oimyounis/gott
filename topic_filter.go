@@ -240,7 +240,7 @@ func (tl *TopicLevel) Print(add string) {
 func (tl *TopicLevel) SubscriptionsString() string {
 	strs := make([]string, 0)
 	for _, s := range tl.Subscriptions {
-		strs = append(strs, fmt.Sprintf("%v:%v", s.Session.client.ClientId, s.QoS))
+		strs = append(strs, fmt.Sprintf("%v:%v", s.Session.Id, s.QoS))
 	}
 
 	return strings.Join(strs, ", ")
