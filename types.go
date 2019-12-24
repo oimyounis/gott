@@ -17,8 +17,8 @@ type Filter struct {
 }
 
 type Subscription struct {
-	Client *Client
-	QoS    byte
+	Session *Session
+	QoS     byte
 }
 
 type Message struct {

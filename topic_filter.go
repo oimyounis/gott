@@ -199,8 +199,8 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	}
 
 	sub := &Subscription{
-		Client: client,
-		QoS:    qos,
+		Session: client.Session,
+		QoS:     qos,
 	}
 
 	tl.Subscriptions = append(tl.Subscriptions, sub)
@@ -232,7 +232,7 @@ func (tl *TopicLevel) Print(add string) {
 func (tl *TopicLevel) SubscriptionsString() string {
 	strs := make([]string, 0)
 	for _, s := range tl.Subscriptions {
-		strs = append(strs, fmt.Sprintf("%v:%v", s.Client.ClientId, s.QoS))
+		strs = append(strs, fmt.Sprintf("%v:%v", s.Session.client.ClientId, s.QoS))
 	}
 
 	return strings.Join(strs, ", ")

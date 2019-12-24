@@ -130,8 +130,8 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 
 		for _, topic := range topicNames {
 			b.PublishRetained(topic.RetainedMessage, &Subscription{
-				Client: client,
-				QoS:    qos,
+				Session: client.Session,
+				QoS:     qos,
 			})
 		}
 	}
@@ -261,7 +261,7 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 
 	//log.Println("sending retained msg", string(msg.Topic), string(msg.Payload))
 
-	if sub.Client.connected {
+	if sub.Session.client != nil && sub.Session.client.connected {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
 		packet, packetId := MakePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
 		if qosOut != 0 {
@@ -270,14 +270,14 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 				Payload: msg.Payload,
 				QoS:     qosOut,
 				Retain:  1,
-				client:  sub.Client,
+				client:  sub.Session.client,
 				Status:  STATUS_UNACKNOWLEDGED,
 			}
 			b.MessageStore.Store(packetId, msg)
 
 			go Retry(packetId, msg)
 		}
-		sub.Client.emit(packet)
+		sub.Session.client.emit(packet)
 	}
 }
 
