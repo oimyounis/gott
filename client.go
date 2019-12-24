@@ -224,7 +224,7 @@ loop:
 			c.Session = NewSession(c, connFlags.CleanSession)
 
 			if connFlags.CleanSession == "1" {
-				_ = GOTT.SessionStore.Delete(c.ClientId)
+				_ = GOTT.SessionStore.Delete(c.ClientId) // as per [MQTT-3.1.2-6]
 			} else if GOTT.SessionStore.Exists(c.ClientId) {
 				sessionPresent = 1
 				if err := c.Session.Load(); err != nil {
@@ -336,6 +336,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
+			c.Session.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
 		case TYPE_PUBREC:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
@@ -355,6 +356,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
+			c.Session.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
 			c.emit(MakePubRelPacket(packetIdBytes))
 		case TYPE_PUBREL:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
@@ -391,6 +393,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
+			c.Session.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
 		case TYPE_SUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
@@ -470,7 +473,7 @@ loop:
 			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
-			c.WillMessage = nil
+			c.WillMessage = nil // as per [MQTT-3.1.2-10]
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
