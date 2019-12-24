@@ -57,3 +57,9 @@ func (s *Session) Acknowledge(packetId uint16, status byte, delete bool) {
 	s.MessageStore.Acknowledge(packetId, status, delete)
 	_ = s.Put()
 }
+
+func (s *Session) Replay() {
+	s.MessageStore.Range(func(packetId uint16, cm *ClientMessage) bool {
+		return true
+	})
+}
