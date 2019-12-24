@@ -6,33 +6,37 @@ import (
 
 type Session struct {
 	client       *Client
-	MessageStore *MessageStore
 	clean        bool
+	Id           string
+	MessageStore *MessageStore
 }
 
 func NewSession(client *Client, cleanFlag string) *Session {
 	return &Session{
 		client:       client,
-		MessageStore: NewMessageStore(),
 		clean:        cleanFlag == "1",
+		MessageStore: NewMessageStore(),
+		Id:           client.ClientId,
 	}
 }
 
 func (s *Session) Load() error {
 	start := time.Now()
-	err := GOTT.SessionStore.Get(s.client.ClientId, s)
-	Log("[BENCHMARK]", "session load took:", time.Since(start))
+	err := GOTT.SessionStore.Get(s.Id, s)
+	end := time.Since(start)
+	Log("[BENCHMARK]", "session load took:", end)
 	return err
 }
 
 func (s *Session) Update(value map[string]interface{}) error {
-	return GOTT.SessionStore.Set(s.client.ClientId, value)
+	return GOTT.SessionStore.Set(s.Id, value)
 }
 
 func (s *Session) Put() error {
 	start := time.Now()
-	err := GOTT.SessionStore.Set(s.client.ClientId, s)
-	Log("[BENCHMARK]", "session put took:", time.Since(start))
+	err := GOTT.SessionStore.Set(s.Id, s)
+	end := time.Since(start)
+	Log("[BENCHMARK]", "session put took:", end)
 	return err
 }
 
