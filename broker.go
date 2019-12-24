@@ -263,12 +263,8 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	}
 }
 
-					go Retry(packetId, msg)
-				}
-				sub.Client.emit(packet)
-			}
-		}
-	}
+func (b *Broker) PublishToClient(c *Client, topic, payload []byte, flags PublishFlags) {
+
 }
 
 func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
