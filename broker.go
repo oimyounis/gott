@@ -231,20 +231,37 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 		//	}
 		//}
 		for _, sub := range match.Subscriptions {
-			if sub.Client != nil && sub.Client.connected {
-				qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
-				// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
-				packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
+			qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
+			// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
+			packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
+
+			var msg *ClientMessage
+
+			if qos != 0 {
+				msg = &ClientMessage{
+					Topic:   topic,
+					Payload: payload,
+					QoS:     qos,
+					Retain:  0,
+					client:  sub.Session.client,
+					Status:  STATUS_UNACKNOWLEDGED,
+				}
+			}
+
+			if sub.Session.client != nil && sub.Session.client.connected {
+				sub.Session.client.emit(packet)
 				if qos != 0 {
-					msg := &ClientMessage{
-						Topic:   topic,
-						Payload: payload,
-						QoS:     qos,
-						Retain:  0,
-						client:  sub.Client,
-						Status:  STATUS_UNACKNOWLEDGED,
-					}
 					b.MessageStore.Store(packetId, msg)
+					go Retry(packetId, msg)
+				}
+			} else if !sub.Session.clean {
+				if qos != 0 {
+					sub.Session.StoreMessage(packetId, msg)
+				}
+			}
+		}
+	}
+}
 
 					go Retry(packetId, msg)
 				}

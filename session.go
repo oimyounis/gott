@@ -47,3 +47,8 @@ func (s *Session) Client() *Client {
 func (s *Session) Clean() bool {
 	return s.clean
 }
+
+func (s *Session) StoreMessage(packetId uint16, msg *ClientMessage) {
+	s.MessageStore.Store(packetId, msg)
+	_ = s.Put()
+}
