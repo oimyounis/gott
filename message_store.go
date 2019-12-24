@@ -57,3 +57,14 @@ func (ms *MessageStore) Get(packetId uint16) *ClientMessage {
 		return nil
 	}
 }
+
+func (ms *MessageStore) Range(iterator func(packetId uint16, cm *ClientMessage) bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	for packetId, cm := range ms.Messages {
+		if next := iterator(packetId, cm); !next {
+			return
+		}
+	}
+}
