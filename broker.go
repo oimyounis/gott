@@ -151,7 +151,7 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) {
 
 	if tl := b.TopicFilterStorage.Find(segs[0]); tl != nil {
 		if segsLen == 1 {
-			tl.DeleteSubscription(client)
+			tl.DeleteSubscription(client, true)
 			return
 		}
 
@@ -162,7 +162,7 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) {
 // TODO: re-implement as this traverses the whole topic tree and all subscriptions (need to optimize this)
 func (b *Broker) UnsubscribeAll(client *Client) {
 	for _, tl := range b.TopicFilterStorage.Filters {
-		tl.DeleteSubscription(client)
+		tl.DeleteSubscription(client, false)
 		tl.TraverseDeleteAll(client)
 	}
 }

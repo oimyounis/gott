@@ -136,7 +136,7 @@ func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
 
 	if l := tl.Find(children[0]); l != nil {
 		if childrenLen == 1 {
-			l.DeleteSubscription(client)
+			l.DeleteSubscription(client, true)
 			return
 		}
 
@@ -146,7 +146,7 @@ func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
 
 func (tl *TopicLevel) TraverseDeleteAll(client *Client) {
 	for _, l := range tl.Children {
-		l.DeleteSubscription(client)
+		l.DeleteSubscription(client, false)
 		l.TraverseDeleteAll(client)
 	}
 }
@@ -189,8 +189,12 @@ func (tl *TopicLevel) FindAll(b []byte) (matches []*TopicLevel) {
 
 func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	for _, sub := range tl.Subscriptions {
-		if sub.Client.ClientId == client.ClientId {
+		if sub.Session.Id == client.ClientId {
 			sub.QoS = qos
+
+			if sub.Session.client == nil {
+				sub.Session.client = client
+			}
 			//if tl.RetainedMessage != nil {
 			//	GOTT.PublishRetained(tl.RetainedMessage, sub)
 			//}
@@ -209,10 +213,14 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	//}
 }
 
-func (tl *TopicLevel) DeleteSubscription(client *Client) {
+func (tl *TopicLevel) DeleteSubscription(client *Client, graceful bool) {
 	for i, sub := range tl.Subscriptions {
-		if sub.Client.ClientId == client.ClientId {
-			tl.deleteSubscription(i)
+		if sub.Session.Id == client.ClientId {
+			if graceful || client.Session.clean {
+				tl.deleteSubscription(i)
+			} else {
+				sub.Session.client = nil
+			}
 			return
 		}
 	}
