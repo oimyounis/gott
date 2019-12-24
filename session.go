@@ -1,6 +1,7 @@
 package gott
 
 import (
+	"log"
 	"time"
 )
 
@@ -63,7 +64,8 @@ func (s *Session) Acknowledge(packetId uint16, status byte, delete bool) {
 }
 
 func (s *Session) Replay() {
-	s.MessageStore.Range(func(packetId uint16, cm *ClientMessage) bool {
+	s.MessageStore.RangeSorted(func(packetId uint16, cm *ClientMessage) bool {
+		log.Println(packetId, string(cm.Topic), string(cm.Payload))
 		return true
 	})
 }

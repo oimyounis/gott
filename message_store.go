@@ -1,6 +1,7 @@
 package gott
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -64,6 +65,26 @@ func (ms *MessageStore) Range(iterator func(packetId uint16, cm *ClientMessage) 
 
 	for packetId, cm := range ms.Messages {
 		if next := iterator(packetId, cm); !next {
+			return
+		}
+	}
+}
+
+func (ms *MessageStore) RangeSorted(iterator func(packetId uint16, cm *ClientMessage) bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	keys := make([]uint16, 0)
+	for k := range ms.Messages {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, packetId := range keys {
+		if next := iterator(packetId, ms.Messages[packetId]); !next {
 			return
 		}
 	}
