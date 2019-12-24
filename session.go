@@ -50,12 +50,16 @@ func (s *Session) Clean() bool {
 
 func (s *Session) StoreMessage(packetId uint16, msg *ClientMessage) {
 	s.MessageStore.Store(packetId, msg)
-	_ = s.Put()
+	if !s.clean {
+		_ = s.Put()
+	}
 }
 
 func (s *Session) Acknowledge(packetId uint16, status byte, delete bool) {
 	s.MessageStore.Acknowledge(packetId, status, delete)
-	_ = s.Put()
+	if !s.clean {
+		_ = s.Put()
+	}
 }
 
 func (s *Session) Replay() {
