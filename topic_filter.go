@@ -194,9 +194,7 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 		if sub.Session.Id == client.ClientId {
 			sub.QoS = qos
 
-			if sub.Session.client == nil {
-				sub.Session.client = client
-			}
+			sub.Session = client.Session
 			//if tl.RetainedMessage != nil {
 			//	GOTT.PublishRetained(tl.RetainedMessage, sub)
 			//}
