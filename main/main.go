@@ -6,8 +6,12 @@ import (
 )
 
 func main() {
-	broker := gott.NewBroker(":1883")
-	if err := broker.Listen(); err != nil {
+	broker, err := gott.NewBroker(":1883")
+	if err != nil {
+		panic(err)
+	}
+
+	if err = broker.Listen(); err != nil {
 		log.Fatalln(err)
 	}
 }
