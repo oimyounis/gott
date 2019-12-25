@@ -317,8 +317,6 @@ loop:
 			}
 
 			GOTT.Publish(topic, payload, publishFlags)
-
-			GOTT.TopicFilterStorage.Print()
 		case TYPE_PUBACK:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -436,6 +434,8 @@ loop:
 			for _, filter := range filterList {
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
+
+			GOTT.TopicFilterStorage.Print()
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
