@@ -1,10 +1,11 @@
 package gott
 
+// Connect Ack return codes
 const (
-	CONNECT_ACCEPTED byte = iota
-	CONNECT_UNACCEPTABLE_PROTO
-	CONNECT_ID_REJECTED
-	CONNECT_SERVER_UNAVAILABLE
-	CONNECT_BAD_USERNAME_PASSWORD
-	CONNECT_NOT_AUTHORIZED
+	ConnectAccepted byte = iota
+	ConnectUnacceptableProto
+	ConnectIDRejected
+	ConnectServerUnavailable
+	ConnectBadUsernamePassword
+	ConnectNotAuthorized
 )

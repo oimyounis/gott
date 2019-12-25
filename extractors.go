@@ -6,9 +6,9 @@ import (
 	"gott/bytes"
 )
 
-var noopConnectFlags = ConnectFlags{}
+var noopConnectFlags = connectFlags{}
 
-func ExtractConnectFlags(b byte) (ConnectFlags, error) {
+func extractConnectFlags(b byte) (connectFlags, error) {
 	var willQos byte
 	qosBit3 := bytes.BitIsSet(b, 3)
 	qosBit4 := bytes.BitIsSet(b, 4)
@@ -34,7 +34,7 @@ func ExtractConnectFlags(b byte) (ConnectFlags, error) {
 	if !willFlag && willRetain {
 		return noopConnectFlags, errors.New("will flag is set to 0 and will retain is not 0")
 	}
-	return ConnectFlags{
+	return connectFlags{
 		CleanSession: bytes.BitIsSet(b, 1),
 		WillFlag:     willFlag,
 		WillQoS:      willQos,
@@ -44,9 +44,9 @@ func ExtractConnectFlags(b byte) (ConnectFlags, error) {
 	}, nil
 }
 
-var noopPublishFlags = PublishFlags{}
+var noopPublishFlags = publishFlags{}
 
-func ExtractPublishFlags(bits string) (PublishFlags, error) {
+func extractPublishFlags(bits string) (publishFlags, error) {
 	var (
 		qos, dup byte
 		retain   bool
@@ -81,15 +81,15 @@ func ExtractPublishFlags(bits string) (PublishFlags, error) {
 		return noopPublishFlags, errors.New("invalid flags in publish packet")
 	}
 
-	return PublishFlags{
+	return publishFlags{
 		DUP:    dup,
 		QoS:    qos,
 		Retain: retain,
 	}, nil
 }
 
-func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
-	filterList := make([]Filter, 0)
+func extractSubTopicFilters(payload []byte) ([]filter, error) {
+	filterList := make([]filter, 0)
 	parsedBytes := 0
 	payloadLen := len(payload)
 
@@ -104,7 +104,7 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 			return nil, errors.New("invalid QoS")
 		}
 
-		filterList = append(filterList, Filter{topicFilter, qos})
+		filterList = append(filterList, filter{topicFilter, qos})
 
 		parsedBytes += topicLen + 3 // 3 is 2 bytes for topic length and 1 for qos
 	}
@@ -116,7 +116,7 @@ func ExtractSubTopicFilters(payload []byte) ([]Filter, error) {
 	return filterList, nil
 }
 
-func ExtractUnSubTopicFilters(payload []byte) ([][]byte, error) {
+func extractUnSubTopicFilters(payload []byte) ([][]byte, error) {
 	filterList := make([][]byte, 0)
 	parsedBytes := 0
 	payloadLen := len(payload)
@@ -138,7 +138,7 @@ func ExtractUnSubTopicFilters(payload []byte) ([][]byte, error) {
 	return filterList, nil
 }
 
-func ParseFixedHeaderFirstByte(b byte) (byte, string) {
+func parseFixedHeaderFirstByte(b byte) (byte, string) {
 	bs := bytes.ByteToBinaryString(b)
 	return b >> 4, bs[4:] // packet type and flags bits (eg. 1101)
 }

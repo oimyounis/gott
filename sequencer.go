@@ -2,14 +2,14 @@ package gott
 
 import "sync"
 
-type Sequencer struct {
+type sequencer struct {
 	current        int64
 	mutex          sync.Mutex
 	UpperBoundBits uint
 	Start          int64
 }
 
-func (seq *Sequencer) Next() int64 {
+func (seq *sequencer) next() int64 {
 	seq.mutex.Lock()
 	defer seq.mutex.Unlock()
 	if seq.current == 1<<seq.UpperBoundBits-1 || seq.current == 0 {
@@ -21,7 +21,7 @@ func (seq *Sequencer) Next() int64 {
 	return current
 }
 
-func (seq *Sequencer) Val() int64 {
+func (seq *sequencer) val() int64 {
 	if seq.current == 0 {
 		return seq.current
 	}

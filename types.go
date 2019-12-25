@@ -2,28 +2,28 @@ package gott
 
 import "time"
 
-type ConnectFlags struct {
+type connectFlags struct {
 	CleanSession, WillFlag, WillRetain, PasswordFlag, UserNameFlag bool
 	WillQoS                                                        byte
 }
 
-type PublishFlags struct {
+type publishFlags struct {
 	DUP, QoS byte
 	Retain   bool
-	PacketId uint16
+	PacketID uint16
 }
 
-type Filter struct {
+type filter struct {
 	Filter []byte
 	QoS    byte
 }
 
-type Subscription struct {
-	Session *Session
+type subscription struct {
+	Session *session
 	QoS     byte
 }
 
-type Message struct {
+type message struct {
 	Topic, Payload []byte
 	QoS            byte
 	Retain         bool

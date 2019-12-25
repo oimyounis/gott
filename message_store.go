@@ -5,72 +5,73 @@ import (
 	"sync"
 )
 
-type ClientMessage struct {
+type clientMessage struct {
 	client         *Client
 	Topic, Payload []byte
 	QoS, Retain    byte
 	Status         byte
 }
 
-func (cm *ClientMessage) Client() *Client {
+func (cm *clientMessage) Client() *Client {
 	return cm.client
 }
 
-type MessageStore struct {
-	Messages map[uint16]*ClientMessage
+type messageStore struct {
+	Messages map[uint16]*clientMessage
 	mutex    sync.RWMutex
 }
 
-func NewMessageStore() *MessageStore {
-	return &MessageStore{Messages: map[uint16]*ClientMessage{}}
+func newMessageStore() *messageStore {
+	return &messageStore{Messages: map[uint16]*clientMessage{}}
 }
 
-func (ms *MessageStore) delete(packetId uint16) {
+func (ms *messageStore) delete(packetID uint16) {
 	ms.mutex.Lock()
-	delete(ms.Messages, packetId)
+	delete(ms.Messages, packetID)
 	ms.mutex.Unlock()
 }
 
-func (ms *MessageStore) Store(packetId uint16, msg *ClientMessage) {
+func (ms *messageStore) store(packetID uint16, msg *clientMessage) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
-	ms.Messages[packetId] = msg
+	ms.Messages[packetID] = msg
 }
 
-func (ms *MessageStore) Acknowledge(packetId uint16, status byte, delete bool) {
-	if cm := ms.Get(packetId); cm != nil {
+func (ms *messageStore) acknowledge(packetID uint16, status byte, delete bool) {
+	if cm := ms.get(packetID); cm != nil {
 		cm.Status = status
 
 		if delete {
-			ms.delete(packetId)
+			ms.delete(packetID)
 		}
 	}
 }
 
-func (ms *MessageStore) Get(packetId uint16) *ClientMessage {
+func (ms *messageStore) get(packetID uint16) *clientMessage {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	if m, ok := ms.Messages[packetId]; ok {
+	if m, ok := ms.Messages[packetID]; ok {
 		return m
-	} else {
-		return nil
 	}
+	return nil
 }
 
-func (ms *MessageStore) Range(iterator func(packetId uint16, cm *ClientMessage) bool) {
+// Range iterates over the underlying message store.
+func (ms *messageStore) Range(iterator func(packetID uint16, cm *clientMessage) bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	for packetId, cm := range ms.Messages {
-		if next := iterator(packetId, cm); !next {
+	for packetID, cm := range ms.Messages {
+		if next := iterator(packetID, cm); !next {
 			return
 		}
 	}
 }
 
-func (ms *MessageStore) RangeSorted(iterator func(packetId uint16, cm *ClientMessage) bool) {
+// RangeSorted iterates over the underlying message store after sorting by key.
+func (ms *messageStore) RangeSorted(iterator func(packetID uint16, cm *clientMessage) bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
@@ -83,8 +84,8 @@ func (ms *MessageStore) RangeSorted(iterator func(packetId uint16, cm *ClientMes
 		return keys[i] < keys[j]
 	})
 
-	for _, packetId := range keys {
-		if next := iterator(packetId, ms.Messages[packetId]); !next {
+	for _, packetID := range keys {
+		if next := iterator(packetID, ms.Messages[packetID]); !next {
 			return
 		}
 	}

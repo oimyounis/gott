@@ -13,15 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// Client is the main struct for every client that connects to GOTT.
+// Holds all the info needed to process its messages and maintain state.
 type Client struct {
 	connection           net.Conn
 	connected            bool
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
-	ClientId             string
-	WillMessage          *Message
+	ClientID             string
+	WillMessage          *message
 	Username, Password   string
-	Session              *Session
+	Session              *session
 }
 
 func (c *Client) listen() {
@@ -63,7 +65,7 @@ loop:
 			remLenEncoded = append(remLenEncoded, lastByte)
 		}
 
-		packetType, flagsBits := ParseFixedHeaderFirstByte(fixedHeader[0])
+		packetType, flagsBits := parseFixedHeaderFirstByte(fixedHeader[0])
 		remLen, err := bytes.Decode(remLenEncoded)
 		if err != nil {
 			log.Println("malformed packet", err)
@@ -73,14 +75,14 @@ loop:
 		c.lastPacketReceivedOn = time.Now()
 
 		switch packetType {
-		case TYPE_CONNECT:
-			payloadLen := remLen - CONNECT_VAR_HEADER_LEN
+		case TypeConnect:
+			payloadLen := remLen - ConnectVarHeaderLen
 			if payloadLen == 0 {
 				log.Println("connect error: payload len is zero")
 				break loop
 			}
 
-			varHeader := make([]byte, CONNECT_VAR_HEADER_LEN)
+			varHeader := make([]byte, ConnectVarHeaderLen)
 			if _, err = io.ReadFull(sockBuffer, varHeader); err != nil {
 				log.Println("error reading var header", err)
 				break loop
@@ -98,13 +100,13 @@ loop:
 				break loop
 			}
 
-			if !utils.ByteInSlice(varHeader[6], SUPPORTED_PROTOCOL_VERSIONS) {
+			if !utils.ByteInSlice(varHeader[6], supportedProtocolVersions) {
 				log.Println("unsupported protocol", varHeader[6])
-				c.emit(MakeConnAckPacket(0, CONNECT_UNACCEPTABLE_PROTO))
+				c.emit(makeConnAckPacket(0, ConnectUnacceptableProto))
 				break loop
 			}
 
-			connFlags, err := ExtractConnectFlags(varHeader[7])
+			connFlags, err := extractConnectFlags(varHeader[7])
 			if err != nil {
 				log.Println("malformed packet: ", err)
 				break loop
@@ -122,22 +124,22 @@ loop:
 			head := 0
 
 			// connect flags parsing
-			clientIdLen := int(binary.BigEndian.Uint16(payload[head:2])) // maximum client ID length is 65535 bytes
+			clientIDLen := int(binary.BigEndian.Uint16(payload[head:2])) // maximum client ID length is 65535 bytes
 			head += 2
-			if clientIdLen == 0 {
+			if clientIDLen == 0 {
 				if !connFlags.CleanSession {
 					log.Println("connect error: received zero byte client id with clean session flag set to 0")
-					c.emit(MakeConnAckPacket(0, CONNECT_ID_REJECTED))
+					c.emit(makeConnAckPacket(0, ConnectIDRejected))
 					break loop
 				}
-				c.ClientId = uuid.New().String()
+				c.ClientID = uuid.New().String()
 			} else {
-				if payloadLen < 2+clientIdLen {
+				if payloadLen < 2+clientIDLen {
 					log.Println("malformed packet: payload length is not valid")
 					break loop
 				}
-				c.ClientId = string(payload[head : head+clientIdLen])
-				head += clientIdLen
+				c.ClientID = string(payload[head : head+clientIDLen])
+				head += clientIDLen
 			}
 
 			if connFlags.WillFlag {
@@ -163,7 +165,7 @@ loop:
 					break loop
 				}
 
-				c.WillMessage = &Message{
+				c.WillMessage = &message{
 					Topic:   willTopic,
 					Payload: willPayload,
 					QoS:     connFlags.WillQoS,
@@ -219,27 +221,27 @@ loop:
 
 			if c.Username != "" { // for testing only, should be implemented as a plugin
 				if auth := c.authenticate(); !auth {
-					c.emit(MakeConnAckPacket(0, CONNECT_NOT_AUTHORIZED))
+					c.emit(makeConnAckPacket(0, ConnectNotAuthorized))
 					break loop
 				}
 			}
 
 			var sessionPresent byte
 
-			c.Session = NewSession(c, connFlags.CleanSession)
+			c.Session = newSession(c, connFlags.CleanSession)
 
 			if connFlags.CleanSession {
-				_ = GOTT.SessionStore.Delete(c.ClientId) // as per [MQTT-3.1.2-6]
-			} else if GOTT.SessionStore.Exists(c.ClientId) {
+				_ = GOTT.SessionStore.delete(c.ClientID) // as per [MQTT-3.1.2-6]
+			} else if GOTT.SessionStore.exists(c.ClientID) {
 				sessionPresent = 1
-				if err := c.Session.Load(); err != nil {
+				if err := c.Session.load(); err != nil {
 					// try to delete stored session in case it was malformed
-					_ = GOTT.SessionStore.Delete(c.ClientId)
+					_ = GOTT.SessionStore.delete(c.ClientID)
 				}
 
-				log.Printf("session for id: %s, session: %#v", c.ClientId, c.Session)
+				log.Printf("session for id: %s, session: %#v", c.ClientID, c.Session)
 			} else {
-				if err := c.Session.Put(); err != nil {
+				if err := c.Session.put(); err != nil {
 					log.Println("error putting session to store:", err)
 					break loop
 				}
@@ -248,13 +250,13 @@ loop:
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
-			log.Println("client connected with id:", c.ClientId)
+			log.Println("client connected with id:", c.ClientID)
 			GOTT.addClient(c)
-			c.emit(MakeConnAckPacket(sessionPresent, CONNECT_ACCEPTED))
+			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
-			c.Session.Replay()
-		case TYPE_PUBLISH:
-			publishFlags, err := ExtractPublishFlags(flagsBits)
+			c.Session.replay()
+		case TypePublish:
+			publishFlags, err := extractPublishFlags(flagsBits)
 			if err != nil {
 				log.Println("error reading publish packet", err)
 				break loop
@@ -280,47 +282,47 @@ loop:
 			topicEnd := 2 + topicLen
 			topic := remBytes[2:topicEnd]
 
-			if !ValidTopicName(topic) {
+			if !validTopicName(topic) {
 				log.Println("malformed packet: invalid topic name")
 				break loop
 			}
 
-			var packetId uint16
-			var packetIdBytes []byte
+			var packetID uint16
+			var packetIDBytes []byte
 
 			varHeaderEnd := topicEnd
 
 			if publishFlags.QoS != 0 {
-				packetIdBytes = remBytes[topicEnd : 2+topicEnd]
-				packetId = binary.BigEndian.Uint16(packetIdBytes)
+				packetIDBytes = remBytes[topicEnd : 2+topicEnd]
+				packetID = binary.BigEndian.Uint16(packetIDBytes)
 				varHeaderEnd += 2
-				publishFlags.PacketId = packetId
+				publishFlags.PacketID = packetID
 			}
 
 			payload := remBytes[varHeaderEnd:]
 
 			if publishFlags.QoS == 1 {
 				// return a PUBACK
-				c.emit(MakePubAckPacket(packetIdBytes))
+				c.emit(makePubAckPacket(packetIDBytes))
 			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
 				if publishFlags.DUP == 1 {
-					if msg := c.Session.MessageStore.Get(packetId); msg != nil {
-						c.emit(MakePubRecPacket(packetIdBytes))
+					if msg := c.Session.MessageStore.get(packetID); msg != nil {
+						c.emit(makePubRecPacket(packetIDBytes))
 						break // skip resending message
 					}
 				}
-				c.Session.MessageStore.Store(packetId, &ClientMessage{
+				c.Session.MessageStore.store(packetID, &clientMessage{
 					Topic:   topic,
 					Payload: payload,
 					QoS:     publishFlags.QoS,
-					Status:  STATUS_PUBREC_RECEIVED,
+					Status:  StatusPubrecReceived,
 				})
-				c.emit(MakePubRecPacket(packetIdBytes))
+				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
 			GOTT.Publish(topic, payload, publishFlags)
-		case TYPE_PUBACK:
+		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
 				break loop
@@ -332,15 +334,15 @@ loop:
 				break loop
 			}
 
-			var packetId uint16
-			var packetIdBytes []byte
+			var packetID uint16
+			var packetIDBytes []byte
 
-			packetIdBytes = remBytes
-			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			packetIDBytes = remBytes
+			packetID = binary.BigEndian.Uint16(packetIDBytes)
 
-			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
-			c.Session.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
-		case TYPE_PUBREC:
+			GOTT.MessageStore.acknowledge(packetID, StatusPubackReceived, true)
+			c.Session.acknowledge(packetID, StatusPubackReceived, true)
+		case TypePubRec:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
 				break loop
@@ -352,32 +354,32 @@ loop:
 				break loop
 			}
 
-			var packetId uint16
-			var packetIdBytes []byte
+			var packetID uint16
+			var packetIDBytes []byte
 
-			packetIdBytes = remBytes
-			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			packetIDBytes = remBytes
+			packetID = binary.BigEndian.Uint16(packetIDBytes)
 
-			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
-			c.Session.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
-			c.emit(MakePubRelPacket(packetIdBytes))
-		case TYPE_PUBREL:
+			GOTT.MessageStore.acknowledge(packetID, StatusPubrecReceived, false)
+			c.Session.acknowledge(packetID, StatusPubrecReceived, false)
+			c.emit(makePubRelPacket(packetIDBytes))
+		case TypePubRel:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
 				log.Println("malformed PUBREL packet: flags bits != 0010")
 				break loop
 			}
 
-			packetIdBytes := make([]byte, PUBREL_REM_LEN)
-			if _, err = io.ReadFull(sockBuffer, packetIdBytes); err != nil {
+			packetIDBytes := make([]byte, PubrelRemLen)
+			if _, err = io.ReadFull(sockBuffer, packetIDBytes); err != nil {
 				log.Println("error reading var header", err)
 				break loop
 			}
 
-			packetId := binary.BigEndian.Uint16(packetIdBytes)
+			packetID := binary.BigEndian.Uint16(packetIDBytes)
 
-			c.Session.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
-			c.emit(MakePubCompPacket(packetIdBytes))
-		case TYPE_PUBCOMP:
+			c.Session.MessageStore.acknowledge(packetID, StatusPubrelReceived, true)
+			c.emit(makePubCompPacket(packetIDBytes))
+		case TypePubComp:
 			if remLen != 2 {
 				log.Println("malformed PUBCOMP packet: invalid remaining length")
 				break loop
@@ -389,15 +391,15 @@ loop:
 				break loop
 			}
 
-			var packetId uint16
-			var packetIdBytes []byte
+			var packetID uint16
+			var packetIDBytes []byte
 
-			packetIdBytes = remBytes
-			packetId = binary.BigEndian.Uint16(packetIdBytes)
+			packetIDBytes = remBytes
+			packetID = binary.BigEndian.Uint16(packetIDBytes)
 
-			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
-			c.Session.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
-		case TYPE_SUBSCRIBE:
+			GOTT.MessageStore.acknowledge(packetID, StatusPubcompReceived, true)
+			c.Session.acknowledge(packetID, StatusPubcompReceived, true)
+		case TypeSubscribe:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
 				break loop
@@ -414,8 +416,8 @@ loop:
 				break loop
 			}
 
-			packetIdBytes := remBytes[0:2]
-			//packetId := binary.BigEndian.Uint16(packetIdBytes)
+			packetIDBytes := remBytes[0:2]
+			//packetID := binary.BigEndian.Uint16(packetIDBytes)
 			payload := remBytes[2:]
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
@@ -423,7 +425,7 @@ loop:
 				break loop
 			}
 
-			filterList, err := ExtractSubTopicFilters(payload)
+			filterList, err := extractSubTopicFilters(payload)
 			if err != nil {
 				log.Println("malformed SUBSCRIBE packet:", err)
 				break loop
@@ -435,8 +437,8 @@ loop:
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
 
-			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
-		case TYPE_UNSUBSCRIBE:
+			c.emit(makeSubAckPacket(packetIDBytes, filterList))
+		case TypeUnsubscribe:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
 				break loop
@@ -452,15 +454,15 @@ loop:
 				break loop
 			}
 
-			packetIdBytes := remBytes[0:2]
-			//packetId := binary.BigEndian.Uint16(packetIdBytes)
+			packetIDBytes := remBytes[0:2]
+			//packetID := binary.BigEndian.Uint16(packetIDBytes)
 			payload := remBytes[2:]
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
 				break loop
 			}
 
-			filterList, err := ExtractUnSubTopicFilters(payload)
+			filterList, err := extractUnSubTopicFilters(payload)
 			if err != nil {
 				log.Println("malformed UNSUBSCRIBE packet:", err)
 				break loop
@@ -470,10 +472,10 @@ loop:
 				GOTT.Unsubscribe(c, filter)
 			}
 
-			c.emit(MakeUnSubAckPacket(packetIdBytes))
-		case TYPE_PINGREQ:
-			c.emit(MakePingRespPacket())
-		case TYPE_DISCONNECT:
+			c.emit(makeUnSubAckPacket(packetIDBytes))
+		case TypePingReq:
+			c.emit(makePingRespPacket())
+		case TypeDisconnect:
 			c.WillMessage = nil // as per [MQTT-3.1.2-10]
 			break loop
 		default:
@@ -492,15 +494,15 @@ func (c *Client) disconnect() {
 	}
 
 	c.closeConnection()
-	GOTT.removeClient(c.ClientId)
+	GOTT.removeClient(c.ClientID)
 
-	log.Printf("client id %s was disconnected", c.ClientId)
+	log.Printf("client id %s was disconnected", c.ClientID)
 
 	GOTT.UnsubscribeAll(c)
 
 	if c.WillMessage != nil {
 		// TODO: see [MQTT-3.1.2-10] after implementing sessions
-		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, PublishFlags{
+		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, publishFlags{
 			Retain: c.WillMessage.Retain,
 			QoS:    c.WillMessage.QoS,
 		})

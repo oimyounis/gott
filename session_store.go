@@ -5,11 +5,11 @@ import (
 	js "github.com/json-iterator/go"
 )
 
-type SessionStore struct {
+type sessionStore struct {
 	*badger.DB
 }
 
-func LoadSessionStore() (*SessionStore, error) {
+func loadSessionStore() (*sessionStore, error) {
 	opts := badger.DefaultOptions(".sessions.store")
 	opts.EventLogging = false
 
@@ -18,10 +18,10 @@ func LoadSessionStore() (*SessionStore, error) {
 		return nil, err
 	}
 
-	return &SessionStore{db}, nil
+	return &sessionStore{db}, nil
 }
 
-func (ss *SessionStore) Get(key string, out *Session) error {
+func (ss *sessionStore) get(key string, out *session) error {
 	return ss.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
 		if err != nil {
@@ -34,14 +34,14 @@ func (ss *SessionStore) Get(key string, out *Session) error {
 	})
 }
 
-func (ss *SessionStore) Exists(key string) bool {
+func (ss *sessionStore) exists(key string) bool {
 	return ss.View(func(txn *badger.Txn) error {
 		_, err := txn.Get([]byte(key))
 		return err
 	}) == nil
 }
 
-func (ss *SessionStore) Set(key string, value interface{}) error {
+func (ss *sessionStore) set(key string, value interface{}) error {
 	txn := ss.NewTransaction(true)
 
 	if err := set(txn, key, value); err == badger.ErrTxnTooBig {
@@ -68,17 +68,17 @@ func (ss *SessionStore) Set(key string, value interface{}) error {
 	return nil
 }
 
-func (ss *SessionStore) Delete(key string) error {
+func (ss *sessionStore) delete(key string) error {
 	return ss.Update(func(txn *badger.Txn) error {
 		return txn.Delete([]byte(key))
 	})
 }
 
 func set(txn *badger.Txn, key string, value interface{}) error {
-	valJson, err := js.Marshal(value)
+	valJSON, err := js.Marshal(value)
 	if err != nil {
 		return nil
 	}
 
-	return txn.Set([]byte(key), valJson)
+	return txn.Set([]byte(key), valJSON)
 }

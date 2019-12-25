@@ -4,67 +4,59 @@ import (
 	"time"
 )
 
-type Session struct {
+type session struct {
 	client       *Client
 	clean        bool
-	Id           string
-	MessageStore *MessageStore
+	ID           string
+	MessageStore *messageStore
 }
 
-func NewSession(client *Client, cleanFlag bool) *Session {
-	return &Session{
+func newSession(client *Client, cleanFlag bool) *session {
+	return &session{
 		client:       client,
 		clean:        cleanFlag,
-		MessageStore: NewMessageStore(),
-		Id:           client.ClientId,
+		MessageStore: newMessageStore(),
+		ID:           client.ClientID,
 	}
 }
 
-func (s *Session) Load() error {
+func (s *session) load() error {
 	start := time.Now()
-	err := GOTT.SessionStore.Get(s.Id, s)
+	err := GOTT.SessionStore.get(s.ID, s)
 	end := time.Since(start)
 	LogBench("session load took:", end)
 	return err
 }
 
-func (s *Session) Put() error {
+func (s *session) put() error {
 	start := time.Now()
-	err := GOTT.SessionStore.Set(s.Id, s)
+	err := GOTT.SessionStore.set(s.ID, s)
 	end := time.Since(start)
 	LogBench("session put took:", end)
 	return err
 }
 
-func (s *Session) Client() *Client {
-	return s.client
-}
-
-func (s *Session) Clean() bool {
-	return s.clean
-}
-
-func (s *Session) StoreMessage(packetId uint16, msg *ClientMessage) {
-	s.MessageStore.Store(packetId, msg)
+func (s *session) storeMessage(packetID uint16, msg *clientMessage) {
+	s.MessageStore.store(packetID, msg)
 	if !s.clean {
-		_ = s.Put()
+		_ = s.put()
 	}
 }
 
-func (s *Session) Acknowledge(packetId uint16, status byte, delete bool) {
-	s.MessageStore.Acknowledge(packetId, status, delete)
+func (s *session) acknowledge(packetID uint16, status byte, delete bool) {
+	s.MessageStore.acknowledge(packetID, status, delete)
 	if !s.clean {
-		_ = s.Put()
+		_ = s.put()
 	}
 }
 
-func (s *Session) Replay() {
+func (s *session) replay() {
 	if s.clean {
 		return
 	}
 
 	if s.client != nil {
-		s.MessageStore.RangeSorted(func(packetId uint16, cm *ClientMessage) bool {
+		s.MessageStore.RangeSorted(func(packetId uint16, cm *clientMessage) bool {
 			GOTT.PublishToClient(s.client, packetId, cm)
 			return true
 		})

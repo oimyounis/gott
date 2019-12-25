@@ -13,32 +13,37 @@ import (
 
 var (
 	// 4 is MQTT v3.1.1
-	SUPPORTED_PROTOCOL_VERSIONS = []byte{4}
+	supportedProtocolVersions = []byte{4}
 )
 
-// This is done to save memory instead of keeping a reference inside each Client
+// GOTT is a singleton used to save memory instead of keeping a reference inside each Client
 var GOTT *Broker
 
+// Broker is the main broker struct. Should not be used directly. Use the global GOTT var instead.
 type Broker struct {
 	address            string
 	listener           net.Listener
 	clients            map[string]*Client
 	mutex              sync.RWMutex
-	TopicFilterStorage *TopicStorage
-	MessageStore       *MessageStore
-	SessionStore       *SessionStore
+	TopicFilterStorage *topicStorage
+	MessageStore       *messageStore
+	SessionStore       *sessionStore
 }
 
+// NewBroker initializes a new object of type Broker. You can either use the returned pointer or the global GOTT var.
+// It takes an address to bind the connection to.
+// Returns a pointer of type Broker which is also assigned to the global GOTT var and an error.
+// It creates/opens an on-disk session store.
 func NewBroker(address string) (*Broker, error) {
 	GOTT = &Broker{
 		address:            address,
 		listener:           nil,
 		clients:            map[string]*Client{},
-		TopicFilterStorage: &TopicStorage{},
-		MessageStore:       NewMessageStore(),
+		TopicFilterStorage: &topicStorage{},
+		MessageStore:       newMessageStore(),
 	}
 
-	ss, err := LoadSessionStore()
+	ss, err := loadSessionStore()
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +52,7 @@ func NewBroker(address string) (*Broker, error) {
 	return GOTT, nil
 }
 
+// Listen starts the broker and listens for new connections on the "address" provided earlier.
 func (b *Broker) Listen() error {
 	l, err := net.Listen("tcp", b.address)
 	if err != nil {
@@ -69,22 +75,22 @@ func (b *Broker) Listen() error {
 
 func (b *Broker) addClient(client *Client) {
 	b.mutex.RLock()
-	if c, ok := b.clients[client.ClientId]; ok {
+	if c, ok := b.clients[client.ClientID]; ok {
 		// disconnect existing client
-		log.Println("disconnecting existing client with id:", c.ClientId)
+		log.Println("disconnecting existing client with id:", c.ClientID)
 		c.closeConnection()
 	}
 	b.mutex.RUnlock()
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	b.clients[client.ClientId] = client
+	b.clients[client.ClientID] = client
 }
 
-func (b *Broker) removeClient(clientId string) {
+func (b *Broker) removeClient(clientID string) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	delete(b.clients, clientId)
+	delete(b.clients, clientID)
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
@@ -97,12 +103,13 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	go c.listen()
 }
 
+// Subscribe receives a client, a filter and qos level to create or update a subscription.
 func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
-	if !ValidFilter(filter) {
+	if !validFilter(filter) {
 		return
 	}
 
-	segs := gob.Split(filter, TOPIC_DELIM)
+	segs := gob.Split(filter, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -110,26 +117,26 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	}
 
 	topLevel := segs[0]
-	tl := b.TopicFilterStorage.Find(topLevel)
+	tl := b.TopicFilterStorage.find(topLevel)
 	if tl == nil {
-		tl = &TopicLevel{Bytes: topLevel}
-		b.TopicFilterStorage.AddTopLevel(tl)
+		tl = &topicLevel{Bytes: topLevel}
+		b.TopicFilterStorage.addTopLevel(tl)
 	}
 
 	if segsLen == 1 {
-		tl.CreateOrUpdateSubscription(client, qos)
+		tl.createOrUpdateSubscription(client, qos)
 		return
 	}
 
-	tl.ParseChildren(client, segs[1:], qos)
+	tl.parseChildren(client, segs[1:], qos)
 
-	if topicNames := b.TopicFilterStorage.ReverseMatch(filter); topicNames != nil {
+	if topicNames := b.TopicFilterStorage.reverseMatch(filter); topicNames != nil {
 		sort.SliceStable(topicNames, func(i, j int) bool { // spec REQUIRES topics to be "Ordered" by default
 			return topicNames[i].RetainedMessage.Timestamp.Before(topicNames[j].RetainedMessage.Timestamp)
 		})
 
 		for _, topic := range topicNames {
-			b.PublishRetained(topic.RetainedMessage, &Subscription{
+			b.PublishRetained(topic.RetainedMessage, &subscription{
 				Session: client.Session,
 				QoS:     qos,
 			})
@@ -137,42 +144,45 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 	}
 }
 
+// Unsubscribe receives a client and a filter to remove a subscription.
 func (b *Broker) Unsubscribe(client *Client, filter []byte) {
-	if !ValidFilter(filter) {
+	if !validFilter(filter) {
 		return
 	}
 
-	segs := gob.Split(filter, TOPIC_DELIM)
+	segs := gob.Split(filter, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
 		return
 	}
 
-	if tl := b.TopicFilterStorage.Find(segs[0]); tl != nil {
+	if tl := b.TopicFilterStorage.find(segs[0]); tl != nil {
 		if segsLen == 1 {
 			tl.DeleteSubscription(client, true)
 			return
 		}
 
-		tl.TraverseDelete(client, segs[1:])
+		tl.traverseDelete(client, segs[1:])
 	}
 }
 
-// TODO: re-implement as this traverses the whole topic tree and all subscriptions (need to optimize this)
+// UnsubscribeAll is used to remove all subscriptions of a client.
+// Currently used when the Client disconnects.
 func (b *Broker) UnsubscribeAll(client *Client) {
 	for _, tl := range b.TopicFilterStorage.Filters {
 		tl.DeleteSubscription(client, false)
-		tl.TraverseDeleteAll(client)
+		tl.traverseDeleteAll(client)
 	}
 }
 
-func (b *Broker) Retain(msg *Message, topic []byte) {
-	if msg != nil && !ValidTopicName(msg.Topic) {
+// Retain stores a msg in a specific topic as a retained message.
+func (b *Broker) Retain(msg *message, topic []byte) {
+	if msg != nil && !validTopicName(msg.Topic) {
 		return
 	}
 
-	segs := gob.Split(topic, TOPIC_DELIM)
+	segs := gob.Split(topic, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -180,32 +190,33 @@ func (b *Broker) Retain(msg *Message, topic []byte) {
 	}
 
 	topLevel := segs[0]
-	tl := b.TopicFilterStorage.Find(topLevel)
+	tl := b.TopicFilterStorage.find(topLevel)
 	if tl == nil {
-		tl = &TopicLevel{Bytes: topLevel}
-		b.TopicFilterStorage.AddTopLevel(tl)
+		tl = &topicLevel{Bytes: topLevel}
+		b.TopicFilterStorage.addTopLevel(tl)
 	}
 
-	if segsLen == 1 && !gob.Equal(tl.Bytes, TOPIC_SINGLE_LEVEL_WILDCARD) {
-		tl.Retain(msg)
+	if segsLen == 1 && !gob.Equal(tl.Bytes, TopicSingleLevelWildcard) {
+		tl.retain(msg)
 		return
 	}
 
-	tl.ParseChildrenRetain(msg, segs[1:])
+	tl.parseChildrenRetain(msg, segs[1:])
 }
 
-func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
+// Publish sends out a payload to all clients with subscriptions on a provided topic given the passed publish flags.
+func (b *Broker) Publish(topic, payload []byte, flags publishFlags) {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
-	if !ValidTopicName(topic) {
+	if !validTopicName(topic) {
 		return
 	}
 
-	matches := b.TopicFilterStorage.Match(topic)
+	matches := b.TopicFilterStorage.match(topic)
 	log.Println(string(topic), "matches", matches)
 
 	if flags.Retain {
 		if len(payload) != 0 {
-			b.Retain(&Message{
+			b.Retain(&message{
 				Topic:     topic,
 				Payload:   payload,
 				QoS:       flags.QoS,
@@ -220,85 +231,88 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 		for _, sub := range match.Subscriptions {
 			qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 			// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
-			packet, packetId := MakePublishPacket(topic, payload, 0, qos, 0)
+			packet, packetID := makePublishPacket(topic, payload, 0, qos, 0)
 
-			var msg *ClientMessage
+			var msg *clientMessage
 
 			if qos != 0 {
-				msg = &ClientMessage{
+				msg = &clientMessage{
 					Topic:   topic,
 					Payload: payload,
 					QoS:     qos,
 					Retain:  0,
 					client:  sub.Session.client,
-					Status:  STATUS_UNACKNOWLEDGED,
+					Status:  StatusUnacknowledged,
 				}
 			}
 
 			if sub.Session.client != nil && sub.Session.client.connected {
 				sub.Session.client.emit(packet)
 				if qos != 0 {
-					b.MessageStore.Store(packetId, msg)
-					go Retry(packetId, msg)
+					b.MessageStore.store(packetID, msg)
+					go Retry(packetID, msg)
 				}
 			} else if !sub.Session.clean {
 				if qos != 0 {
-					sub.Session.StoreMessage(packetId, msg)
+					sub.Session.storeMessage(packetID, msg)
 				}
 			}
 		}
 	}
 }
 
-func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
+// PublishRetained is used to publish retained messages to a subscribing client.
+func (b *Broker) PublishRetained(msg *message, sub *subscription) {
 	if msg == nil || sub == nil {
 		return
 	}
 
 	if sub.Session.client != nil && sub.Session.client.connected {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
-		packet, packetId := MakePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
+		packet, packetID := makePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
 		if qosOut != 0 {
-			msg := &ClientMessage{
+			msg := &clientMessage{
 				Topic:   msg.Topic,
 				Payload: msg.Payload,
 				QoS:     qosOut,
 				Retain:  1,
 				client:  sub.Session.client,
-				Status:  STATUS_UNACKNOWLEDGED,
+				Status:  StatusUnacknowledged,
 			}
-			b.MessageStore.Store(packetId, msg)
+			b.MessageStore.store(packetID, msg)
 
-			go Retry(packetId, msg)
+			go Retry(packetID, msg)
 		}
 		sub.Session.client.emit(packet)
 	}
 }
 
-func (b *Broker) PublishToClient(client *Client, packetId uint16, cm *ClientMessage) {
+// PublishToClient is used to publish a message with a provided packetId to a specific client.
+func (b *Broker) PublishToClient(client *Client, packetID uint16, cm *clientMessage) {
 	if client.connected {
-		packet := MakePublishPacketWithId(packetId, cm.Topic, cm.Payload, 0, cm.QoS, 0)
+		packet := makePublishPacketWithID(packetID, cm.Topic, cm.Payload, 0, cm.QoS, 0)
 		if cm.QoS != 0 {
 			cm.client = client
 			cm.Retain = 0
-			b.MessageStore.Store(packetId, cm)
+			b.MessageStore.store(packetID, cm)
 
-			if cm.Status == STATUS_UNACKNOWLEDGED {
+			if cm.Status == StatusUnacknowledged {
 				client.emit(packet)
 			}
 
-			go Retry(packetId, cm)
+			go Retry(packetID, cm)
 		}
 	}
 }
 
-func Retry(packetId uint16, msg *ClientMessage) {
+// Retry will check for a msg's status and resend it if it hasn't been acknowledged within 20 seconds.
+func Retry(packetID uint16, msg *clientMessage) {
 	defer Recover(nil)
 	for {
 		time.Sleep(time.Second * 5)
 		if msg != nil && msg.client != nil && msg.client.connected {
 			switch msg.Status {
-			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
+			case StatusPubackReceived, StatusPubcompReceived:
 				return
 			}
 		} else {
@@ -309,17 +323,17 @@ func Retry(packetId uint16, msg *ClientMessage) {
 
 		if msg.client.connected {
 			switch msg.Status {
-			case STATUS_UNACKNOWLEDGED:
-				msg.client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
-			case STATUS_PUBREC_RECEIVED:
-				packetIdBytes := make([]byte, 2)
-				binary.BigEndian.PutUint16(packetIdBytes, packetId)
-				msg.client.emit(MakePubRelPacket(packetIdBytes))
-			case STATUS_PUBREL_RECEIVED:
-				packetIdBytes := make([]byte, 2)
-				binary.BigEndian.PutUint16(packetIdBytes, packetId)
-				msg.client.emit(MakePubCompPacket(packetIdBytes))
-			case STATUS_PUBACK_RECEIVED, STATUS_PUBCOMP_RECEIVED:
+			case StatusUnacknowledged:
+				msg.client.emit(makePublishPacketWithID(packetID, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
+			case StatusPubrecReceived:
+				packetIDBytes := make([]byte, 2)
+				binary.BigEndian.PutUint16(packetIDBytes, packetID)
+				msg.client.emit(makePubRelPacket(packetIDBytes))
+			case StatusPubrelReceived:
+				packetIDBytes := make([]byte, 2)
+				binary.BigEndian.PutUint16(packetIDBytes, packetID)
+				msg.client.emit(makePubCompPacket(packetIDBytes))
+			case StatusPubackReceived, StatusPubcompReceived:
 				return
 			}
 		} else {

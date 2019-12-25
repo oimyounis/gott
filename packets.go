@@ -6,60 +6,60 @@ import (
 	"log"
 )
 
-var packetSeq = &Sequencer{UpperBoundBits: 16, Start: 1}
+var packetSeq = &sequencer{UpperBoundBits: 16, Start: 1}
 
-func MakeConnAckPacket(sessionPresent, returnCode byte) []byte {
-	return []byte{TYPE_CONNACK_BYTE, CONNECT_REM_LEN, sessionPresent, returnCode}
+func makeConnAckPacket(sessionPresent, returnCode byte) []byte {
+	return []byte{TypeConnAck << 4, ConnectRemLen, sessionPresent, returnCode}
 }
 
-func MakePubAckPacket(id []byte) []byte {
-	return []byte{TYPE_PUBACK_BYTE, PUBACK_REM_LEN, id[0], id[1]}
+func makePubAckPacket(id []byte) []byte {
+	return []byte{TypePubAck << 4, PubackRemLen, id[0], id[1]}
 }
 
-func MakePubRecPacket(id []byte) []byte {
-	return []byte{TYPE_PUBREC_BYTE, PUBREC_REM_LEN, id[0], id[1]}
+func makePubRecPacket(id []byte) []byte {
+	return []byte{TypePubRec << 4, PubrecRemLen, id[0], id[1]}
 }
 
-func MakePubRelPacket(id []byte) []byte {
+func makePubRelPacket(id []byte) []byte {
 	// +2 according to [MQTT-3.6.1-1]
-	return []byte{TYPE_PUBREL_BYTE + 2, PUBREL_REM_LEN, id[0], id[1]}
+	return []byte{TypePubRel<<4 + 2, PubrelRemLen, id[0], id[1]}
 }
 
-func MakePubCompPacket(id []byte) []byte {
-	return []byte{TYPE_PUBCOMP_BYTE, PUBCOMP_REM_LEN, id[0], id[1]}
+func makePubCompPacket(id []byte) []byte {
+	return []byte{TypePubComp << 4, PubcompRemLen, id[0], id[1]}
 }
 
-func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
-	packet := []byte{TYPE_SUBACK_BYTE}
+func makeSubAckPacket(id []byte, filterList []filter) []byte {
+	packet := []byte{TypeSubAck << 4}
 
-	packet = append(packet, bytes.Encode(SUBACK_REM_LEN+len(filterList))...)
+	packet = append(packet, bytes.Encode(SubackRemLen+len(filterList))...)
 	packet = append(packet, id...)
 
 	for _, filter := range filterList {
-		if ValidFilter(filter.Filter) {
+		if validFilter(filter.Filter) {
 			packet = append(packet, filter.QoS)
 		} else {
-			// in case of failure append SUBACK_FAILURE_CODE (128)
-			packet = append(packet, SUBACK_FAILURE_CODE)
+			// in case of failure append SubackFailureCode (128)
+			packet = append(packet, SubackFailureCode)
 		}
 	}
 	log.Println("SUBACK", packet)
 	return packet
 }
 
-func MakeUnSubAckPacket(id []byte) []byte {
-	packet := []byte{TYPE_UNSUBACK_BYTE, UNSUBACK_REM_LEN, id[0], id[1]}
+func makeUnSubAckPacket(id []byte) []byte {
+	packet := []byte{TypeUnsubAck << 4, UnsubackRemLen, id[0], id[1]}
 	log.Println("UNSUBACK", packet)
 	return packet
 }
 
-func MakePingRespPacket() []byte {
-	packet := []byte{TYPE_PINGRESP_BYTE, PINGRESP_REM_LEN}
+func makePingRespPacket() []byte {
+	packet := []byte{TypePingResp << 4, PingrespRemLen}
 	log.Println("PINGRESP", packet)
 	return packet
 }
 
-func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte, packetId uint16) {
+func makePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte, packetID uint16) {
 	if qos == 0 { // as per [MQTT-3.3.1-2]
 		dupFlag = 0
 	}
@@ -68,7 +68,7 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 	}
 
 	// 2nd byte... = remaining length (var header len + payload len)
-	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag}
+	fixedHeader := []byte{TypePublish<<4 + dupFlag<<3 + qos<<1 + retainFlag}
 
 	varHeader := make([]byte, 2) // topic name + packet identifier
 	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
@@ -76,8 +76,8 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 
 	if qos > 0 {
 		varHeader = append(varHeader, 0, 0)
-		packetId = uint16(packetSeq.Next())
-		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetId)
+		packetID = uint16(packetSeq.next())
+		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetID)
 	}
 
 	packet = append(packet, fixedHeader...)
@@ -88,7 +88,7 @@ func MakePublishPacket(topic, payload []byte, dupFlag, qos, retainFlag byte) (pa
 	return
 }
 
-func MakePublishPacketWithId(packetId uint16, topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
+func makePublishPacketWithID(packetID uint16, topic, payload []byte, dupFlag, qos, retainFlag byte) (packet []byte) {
 	if qos == 0 { // as per [MQTT-3.3.1-2]
 		dupFlag = 0
 	}
@@ -97,7 +97,7 @@ func MakePublishPacketWithId(packetId uint16, topic, payload []byte, dupFlag, qo
 	}
 
 	// 2nd byte... = remaining length (var header len + payload len)
-	fixedHeader := []byte{TYPE_PUBLISH_BYTE + dupFlag<<3 + qos<<1 + retainFlag}
+	fixedHeader := []byte{TypePublish<<4 + dupFlag<<3 + qos<<1 + retainFlag}
 
 	varHeader := make([]byte, 2) // topic name + packet identifier
 	binary.BigEndian.PutUint16(varHeader, uint16(len(topic)))
@@ -105,7 +105,7 @@ func MakePublishPacketWithId(packetId uint16, topic, payload []byte, dupFlag, qo
 
 	if qos >= 1 {
 		varHeader = append(varHeader, 0, 0)
-		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetId)
+		binary.BigEndian.PutUint16(varHeader[len(varHeader)-2:], packetID)
 	}
 
 	packet = append(packet, fixedHeader...)
