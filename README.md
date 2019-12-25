@@ -1,5 +1,6 @@
 # GOTT
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/oimyounis/gott)](https://goreportcard.com/report/github.com/oimyounis/gott)
 [![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
 
 GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance pluggable broker with most of the features that could be embedded in a broker available out of the box.  
