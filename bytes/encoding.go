@@ -17,7 +17,7 @@ func Encode(x int) (encoded []byte) {
 	return
 }
 
-// Encode takes an encoded Remaining Length slice of bytes and decodes it into an integer.
+// Decode takes an encoded Remaining Length slice of bytes and decodes it into an integer.
 // Returns an additional error if the decoding fails.
 func Decode(stream []byte) (int, error) {
 	mult := 1
