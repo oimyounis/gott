@@ -263,10 +263,6 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	}
 }
 
-func (b *Broker) PublishToClient(c *Client, topic, payload []byte, flags PublishFlags) {
-
-}
-
 func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 	if msg == nil || sub == nil {
 		return
@@ -294,6 +290,23 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 	}
 }
 
+func (b *Broker) PublishToClient(client *Client, packetId uint16, cm *ClientMessage) {
+	if client.connected {
+		packet := MakePublishPacketWithId(packetId, cm.Topic, cm.Payload, 0, cm.QoS, 0)
+		if cm.QoS != 0 {
+			cm.client = client
+			cm.Retain = 0
+			b.MessageStore.Store(packetId, cm)
+
+			if cm.Status == STATUS_UNACKNOWLEDGED {
+				client.emit(packet)
+			}
+
+			go Retry(packetId, cm)
+		}
+	}
+}
+
 func Retry(packetId uint16, msg *ClientMessage) {
 	defer Recover(nil)
 	for {
@@ -309,7 +322,7 @@ func Retry(packetId uint16, msg *ClientMessage) {
 
 		time.Sleep(time.Second * 15)
 
-		if msg != nil && msg.client != nil && msg.client.connected {
+		if msg.client.connected {
 			switch msg.Status {
 			case STATUS_UNACKNOWLEDGED:
 				msg.client.emit(MakePublishPacketWithId(packetId, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))
