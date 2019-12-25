@@ -2,10 +2,10 @@ package gott
 
 import (
 	"log"
-	"os"
 )
 
-var Log = func(prefix string, v ...interface{}) {
-	l := log.New(os.Stdout, prefix+" ", log.LstdFlags)
-	l.Println(v...)
+var LogBench = func(v ...interface{}) {
+	printList := []interface{}{"[BENCHMARK]"}
+	printList = append(printList, v...)
+	log.Println(printList...)
 }

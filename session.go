@@ -25,7 +25,7 @@ func (s *Session) Load() error {
 	start := time.Now()
 	err := GOTT.SessionStore.Get(s.Id, s)
 	end := time.Since(start)
-	Log("[BENCHMARK]", "session load took:", end)
+	LogBench("session load took:", end)
 	return err
 }
 
@@ -37,7 +37,7 @@ func (s *Session) Put() error {
 	start := time.Now()
 	err := GOTT.SessionStore.Set(s.Id, s)
 	end := time.Since(start)
-	Log("[BENCHMARK]", "session put took:", end)
+	LogBench("session put took:", end)
 	return err
 }
 
