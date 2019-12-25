@@ -50,7 +50,6 @@ loop:
 			log.Println("fixedHeader read error", err)
 			break
 		}
-		//log.Println("read", fixedHeader)
 
 		lastByte := fixedHeader[1]
 		remLenEncoded := []byte{lastByte}
@@ -71,27 +70,21 @@ loop:
 			break loop
 		}
 
-		//log.Println("packetType:", packetType, "remLen:", remLen)
-
 		c.lastPacketReceivedOn = time.Now()
 
 		switch packetType {
 		case TYPE_CONNECT:
-			//log.Println("client trying to connect")
-
 			payloadLen := remLen - CONNECT_VAR_HEADER_LEN
 			if payloadLen == 0 {
 				log.Println("connect error: payload len is zero")
 				break loop
 			}
 
-			//log.Println("rem len", remLen)
 			varHeader := make([]byte, CONNECT_VAR_HEADER_LEN)
 			if _, err = io.ReadFull(sockBuffer, varHeader); err != nil {
 				log.Println("error reading var header", err)
 				break loop
 			}
-			//log.Println("var header", varHeader)
 
 			protocolNameLen := binary.BigEndian.Uint16(varHeader[0:2])
 			if protocolNameLen != 4 {
@@ -125,11 +118,10 @@ loop:
 				log.Println("error reading payload", err)
 				break loop
 			}
-			//log.Println("payload", payload)
 
 			head := 0
 
-			// client id parsing
+			// connect flags parsing
 			clientIdLen := int(binary.BigEndian.Uint16(payload[head:2])) // maximum client ID length is 65535 bytes
 			head += 2
 			if clientIdLen == 0 {
@@ -177,8 +169,6 @@ loop:
 					QoS:     connFlags.WillQoS,
 					Retain:  connFlags.WillRetain,
 				}
-
-				log.Println("will:", string(c.WillMessage.Topic), "-", string(c.WillMessage.Payload), "-", c.WillMessage.QoS, "-", c.WillMessage.Retain)
 			}
 
 			if connFlags.UserNameFlag {
@@ -225,8 +215,6 @@ loop:
 					break loop
 				}
 				c.Password = string(password)
-
-				log.Println("password:", c.Password)
 			}
 
 			if c.Username != "" { // for testing only, should be implemented as a plugin
@@ -240,7 +228,7 @@ loop:
 
 			c.Session = NewSession(c, connFlags.CleanSession)
 
-			if connFlags.CleanSession == "1" {
+			if connFlags.CleanSession {
 				_ = GOTT.SessionStore.Delete(c.ClientId) // as per [MQTT-3.1.2-6]
 			} else if GOTT.SessionStore.Exists(c.ClientId) {
 				sessionPresent = 1
@@ -310,8 +298,6 @@ loop:
 			}
 
 			payload := remBytes[varHeaderEnd:]
-
-			//log.Println("pub in ::", "dup:", publishFlags.DUP, "qos:", publishFlags.QoS, "retain:", publishFlags.Retain, "packetid:", packetId, "topic:", topic, "payload:", payload)
 
 			if publishFlags.QoS == 1 {
 				// return a PUBACK
@@ -443,16 +429,13 @@ loop:
 				break loop
 			}
 
-			// NOTE: see [MQTT-3.8.4-3] when implementing the SUB list, retention policy and server > clients publish
-
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
-			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
 
 			for _, filter := range filterList {
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
 
-			GOTT.TopicFilterStorage.Print()
+			c.emit(MakeSubAckPacket(packetIdBytes, filterList))
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
@@ -489,7 +472,6 @@ loop:
 
 			c.emit(MakeUnSubAckPacket(packetIdBytes))
 		case TYPE_PINGREQ:
-			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
 			c.WillMessage = nil // as per [MQTT-3.1.2-10]
@@ -534,7 +516,6 @@ func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
-	//log.Println("emit out <", c.ClientId, packet)
 }
 
 // For test purposes only

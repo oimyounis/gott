@@ -16,7 +16,7 @@ var (
 	SUPPORTED_PROTOCOL_VERSIONS = []byte{4}
 )
 
-// this is done to save memory instead of keeping a reference inside each Client
+// This is done to save memory instead of keeping a reference inside each Client
 var GOTT *Broker
 
 type Broker struct {
@@ -65,7 +65,6 @@ func (b *Broker) Listen() error {
 			go b.handleConnection(conn)
 		}
 	}
-	//return nil
 }
 
 func (b *Broker) addClient(client *Client) {
@@ -90,7 +89,7 @@ func (b *Broker) removeClient(clientId string) {
 
 func (b *Broker) handleConnection(conn net.Conn) {
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
-	//client := b.addClient(conn)
+
 	c := &Client{
 		connection: conn,
 		connected:  true,
@@ -204,7 +203,6 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 	matches := b.TopicFilterStorage.Match(topic)
 	log.Println(string(topic), "matches", matches)
 
-	//if len(matches) == 0 || !FilterInSlice(topic, matches) {
 	if flags.Retain {
 		if len(payload) != 0 {
 			b.Retain(&Message{
@@ -217,20 +215,8 @@ func (b *Broker) Publish(topic, payload []byte, flags PublishFlags) {
 			b.Retain(nil, topic)
 		}
 	}
-	//}
 
 	for _, match := range matches {
-		//if flags.Retain == 1 {
-		//	if len(payload) != 0 {
-		//		match.Retain(&Message{
-		//			Topic:   topic,
-		//			Payload: payload,
-		//			QoS:     flags.QoS,
-		//		})
-		//	} else {
-		//		match.Retain(nil)
-		//	}
-		//}
 		for _, sub := range match.Subscriptions {
 			qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 			// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
@@ -268,8 +254,6 @@ func (b *Broker) PublishRetained(msg *Message, sub *Subscription) {
 	if msg == nil || sub == nil {
 		return
 	}
-
-	//log.Println("sending retained msg", string(msg.Topic), string(msg.Payload))
 
 	if sub.Session.client != nil && sub.Session.client.connected {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
