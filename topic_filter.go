@@ -195,9 +195,6 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 			sub.QoS = qos
 
 			sub.Session = client.Session
-			//if tl.RetainedMessage != nil {
-			//	GOTT.PublishRetained(tl.RetainedMessage, sub)
-			//}
 			return
 		}
 	}
@@ -208,9 +205,6 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	}
 
 	tl.Subscriptions = append(tl.Subscriptions, sub)
-	//if tl.RetainedMessage != nil {
-	//	GOTT.PublishRetained(tl.RetainedMessage, sub)
-	//}
 }
 
 func (tl *TopicLevel) DeleteSubscription(client *Client, graceful bool) {
@@ -322,10 +316,7 @@ func (ts *TopicStorage) Match(topic []byte) []*TopicLevel {
 	matches := make([]*TopicLevel, 0)
 
 	segs := gob.Split(topic, TOPIC_DELIM)
-
 	hits := ts.FindAll(segs[0])
-
-	//log.Printf("hits: %s", hits)
 
 	for _, hit := range hits {
 		hit.match(segs[1:], &matches)
@@ -335,10 +326,6 @@ func (ts *TopicStorage) Match(topic []byte) []*TopicLevel {
 }
 
 func (ts *TopicStorage) ReverseMatch(filter []byte) []*TopicLevel {
-	//if !utils.ByteInSlice(TOPIC_SINGLE_LEVEL_WILDCARD[0], filter) && !utils.ByteInSlice(TOPIC_MULTI_LEVEL_WILDCARD[0], filter) {
-	//return nil
-	//}
-
 	segs := gob.Split(filter, TOPIC_DELIM)
 	segsLen := len(segs)
 

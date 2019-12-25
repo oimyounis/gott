@@ -29,7 +29,3 @@ type Message struct {
 	Retain         bool
 	Timestamp      time.Time // used for sorting retained messages in the order they were received (less is first)
 }
-
-type PacketStatus struct {
-	QoS, Status byte
-}

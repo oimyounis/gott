@@ -11,10 +11,10 @@ type Session struct {
 	MessageStore *MessageStore
 }
 
-func NewSession(client *Client, cleanFlag string) *Session {
+func NewSession(client *Client, cleanFlag bool) *Session {
 	return &Session{
 		client:       client,
-		clean:        cleanFlag == "1",
+		clean:        cleanFlag,
 		MessageStore: NewMessageStore(),
 		Id:           client.ClientId,
 	}
@@ -26,10 +26,6 @@ func (s *Session) Load() error {
 	end := time.Since(start)
 	LogBench("session load took:", end)
 	return err
-}
-
-func (s *Session) Update(value map[string]interface{}) error {
-	return GOTT.SessionStore.Set(s.Id, value)
 }
 
 func (s *Session) Put() error {

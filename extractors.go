@@ -140,9 +140,5 @@ func ExtractUnSubTopicFilters(payload []byte) ([][]byte, error) {
 
 func ParseFixedHeaderFirstByte(b byte) (byte, string) {
 	bs := bytes.ByteToBinaryString(b)
-	packetType, err := bytes.BinaryStringToByte(bs[:4])
-	if err != nil {
-		return 0, ""
-	}
-	return packetType, bs[4:] // packet type and flags bits (eg. 1101)
+	return b >> 4, bs[4:] // packet type and flags bits (eg. 1101)
 }

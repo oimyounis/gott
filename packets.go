@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-var packetSeq *Sequencer = &Sequencer{UpperBoundBits: 16, Start: 1}
+var packetSeq = &Sequencer{UpperBoundBits: 16, Start: 1}
 
 func MakeConnAckPacket(sessionPresent, returnCode byte) []byte {
 	return []byte{TYPE_CONNACK_BYTE, CONNECT_REM_LEN, sessionPresent, returnCode}
@@ -37,7 +37,7 @@ func MakeSubAckPacket(id []byte, filterList []Filter) []byte {
 
 	for _, filter := range filterList {
 		if ValidFilter(filter.Filter) {
-			packet = append(packet, filter.QoS) // QoS here should be the Maximum QoS determined by the server, see [3.8.4]
+			packet = append(packet, filter.QoS)
 		} else {
 			// in case of failure append SUBACK_FAILURE_CODE (128)
 			packet = append(packet, SUBACK_FAILURE_CODE)
