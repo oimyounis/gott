@@ -246,6 +246,8 @@ loop:
 			log.Println("client connected with id:", c.ClientId)
 			GOTT.addClient(c)
 			c.emit(MakeConnAckPacket(sessionPresent, CONNECT_ACCEPTED))
+
+			c.Session.Replay()
 		case TYPE_PUBLISH:
 			publishFlags, err := ExtractPublishFlags(flagsBits)
 			if err != nil {
