@@ -90,15 +90,17 @@ func (tl *TopicLevel) ParseChildren(client *Client, children [][]byte, qos byte)
 
 	b := children[0]
 	l := tl.Find(b)
+
 	if l == nil {
 		l = &TopicLevel{Bytes: b, parent: tl}
 		tl.AddChild(l)
-		if gob.Equal(b, TOPIC_SINGLE_LEVEL_WILDCARD) {
-			tl.hasSingleWildcardAsChild = true
-		} else if gob.Equal(b, TOPIC_MULTI_LEVEL_WILDCARD) {
-			tl.hasMultiWildcardAsChild = true
-			tl.CreateOrUpdateSubscription(client, qos)
-		}
+	}
+
+	if gob.Equal(b, TOPIC_SINGLE_LEVEL_WILDCARD) {
+		tl.hasSingleWildcardAsChild = true
+	} else if gob.Equal(b, TOPIC_MULTI_LEVEL_WILDCARD) {
+		tl.hasMultiWildcardAsChild = true
+		tl.CreateOrUpdateSubscription(client, qos)
 	}
 
 	if childrenLen == 1 {
@@ -136,7 +138,7 @@ func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
 
 	if l := tl.Find(children[0]); l != nil {
 		if childrenLen == 1 {
-			l.DeleteSubscription(client)
+			l.DeleteSubscription(client, true)
 			return
 		}
 
@@ -146,7 +148,7 @@ func (tl *TopicLevel) TraverseDelete(client *Client, children [][]byte) {
 
 func (tl *TopicLevel) TraverseDeleteAll(client *Client) {
 	for _, l := range tl.Children {
-		l.DeleteSubscription(client)
+		l.DeleteSubscription(client, false)
 		l.TraverseDeleteAll(client)
 	}
 }
@@ -189,8 +191,10 @@ func (tl *TopicLevel) FindAll(b []byte) (matches []*TopicLevel) {
 
 func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	for _, sub := range tl.Subscriptions {
-		if sub.Client.ClientId == client.ClientId {
+		if sub.Session.Id == client.ClientId {
 			sub.QoS = qos
+
+			sub.Session = client.Session
 			//if tl.RetainedMessage != nil {
 			//	GOTT.PublishRetained(tl.RetainedMessage, sub)
 			//}
@@ -199,8 +203,8 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	}
 
 	sub := &Subscription{
-		Client: client,
-		QoS:    qos,
+		Session: client.Session,
+		QoS:     qos,
 	}
 
 	tl.Subscriptions = append(tl.Subscriptions, sub)
@@ -209,10 +213,14 @@ func (tl *TopicLevel) CreateOrUpdateSubscription(client *Client, qos byte) {
 	//}
 }
 
-func (tl *TopicLevel) DeleteSubscription(client *Client) {
+func (tl *TopicLevel) DeleteSubscription(client *Client, graceful bool) {
 	for i, sub := range tl.Subscriptions {
-		if sub.Client.ClientId == client.ClientId {
-			tl.deleteSubscription(i)
+		if sub.Session.Id == client.ClientId {
+			if graceful || client.Session.clean {
+				tl.deleteSubscription(i)
+			} else {
+				sub.Session.client = nil
+			}
 			return
 		}
 	}
@@ -232,7 +240,7 @@ func (tl *TopicLevel) Print(add string) {
 func (tl *TopicLevel) SubscriptionsString() string {
 	strs := make([]string, 0)
 	for _, s := range tl.Subscriptions {
-		strs = append(strs, fmt.Sprintf("%v:%v", s.Client.ClientId, s.QoS))
+		strs = append(strs, fmt.Sprintf("%v:%v", s.Session.Id, s.QoS))
 	}
 
 	return strings.Join(strs, ", ")

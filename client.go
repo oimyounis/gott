@@ -19,9 +19,9 @@ type Client struct {
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
 	ClientId             string
-	MessageStore         *MessageStore
 	WillMessage          *Message
 	Username, Password   string
+	Session              *Session
 }
 
 func (c *Client) listen() {
@@ -236,14 +236,35 @@ loop:
 				}
 			}
 
-			// TODO: implement Session
+			var sessionPresent byte
+
+			c.Session = NewSession(c, connFlags.CleanSession)
+
+			if connFlags.CleanSession == "1" {
+				_ = GOTT.SessionStore.Delete(c.ClientId) // as per [MQTT-3.1.2-6]
+			} else if GOTT.SessionStore.Exists(c.ClientId) {
+				sessionPresent = 1
+				if err := c.Session.Load(); err != nil {
+					// try to delete stored session in case it was malformed
+					_ = GOTT.SessionStore.Delete(c.ClientId)
+				}
+
+				log.Printf("session for id: %s, session: %#v", c.ClientId, c.Session)
+			} else {
+				if err := c.Session.Put(); err != nil {
+					log.Println("error putting session to store:", err)
+					break loop
+				}
+			}
 
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
 			log.Println("client connected with id:", c.ClientId)
 			GOTT.addClient(c)
-			c.emit(MakeConnAckPacket(0, CONNECT_ACCEPTED)) // TODO: fix sessionPresent after implementing sessions
+			c.emit(MakeConnAckPacket(sessionPresent, CONNECT_ACCEPTED))
+
+			c.Session.Replay()
 		case TYPE_PUBLISH:
 			publishFlags, err := ExtractPublishFlags(flagsBits)
 			if err != nil {
@@ -298,12 +319,12 @@ loop:
 			} else if publishFlags.QoS == 2 {
 				// return a PUBREC
 				if publishFlags.DUP == 1 {
-					if msg := c.MessageStore.Get(packetId); msg != nil {
+					if msg := c.Session.MessageStore.Get(packetId); msg != nil {
 						c.emit(MakePubRecPacket(packetIdBytes))
 						break // skip resending message
 					}
 				}
-				c.MessageStore.Store(packetId, &ClientMessage{
+				c.Session.MessageStore.Store(packetId, &ClientMessage{
 					Topic:   topic,
 					Payload: payload,
 					QoS:     publishFlags.QoS,
@@ -313,8 +334,6 @@ loop:
 			}
 
 			GOTT.Publish(topic, payload, publishFlags)
-
-			GOTT.TopicFilterStorage.Print()
 		case TYPE_PUBACK:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -334,6 +353,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
+			c.Session.Acknowledge(packetId, STATUS_PUBACK_RECEIVED, true)
 		case TYPE_PUBREC:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
@@ -353,6 +373,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
+			c.Session.Acknowledge(packetId, STATUS_PUBREC_RECEIVED, false)
 			c.emit(MakePubRelPacket(packetIdBytes))
 		case TYPE_PUBREL:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
@@ -368,7 +389,7 @@ loop:
 
 			packetId := binary.BigEndian.Uint16(packetIdBytes)
 
-			c.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
+			c.Session.MessageStore.Acknowledge(packetId, STATUS_PUBREL_RECEIVED, true)
 			c.emit(MakePubCompPacket(packetIdBytes))
 		case TYPE_PUBCOMP:
 			if remLen != 2 {
@@ -389,6 +410,7 @@ loop:
 			packetId = binary.BigEndian.Uint16(packetIdBytes)
 
 			GOTT.MessageStore.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
+			c.Session.Acknowledge(packetId, STATUS_PUBCOMP_RECEIVED, true)
 		case TYPE_SUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
@@ -429,6 +451,8 @@ loop:
 			for _, filter := range filterList {
 				GOTT.Subscribe(c, filter.Filter, filter.QoS)
 			}
+
+			GOTT.TopicFilterStorage.Print()
 		case TYPE_UNSUBSCRIBE:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
@@ -468,7 +492,7 @@ loop:
 			log.Printf("PINGREQ in > %v", fixedHeader)
 			c.emit(MakePingRespPacket())
 		case TYPE_DISCONNECT:
-			c.WillMessage = nil
+			c.WillMessage = nil // as per [MQTT-3.1.2-10]
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")

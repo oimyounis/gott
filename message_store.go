@@ -1,32 +1,33 @@
 package gott
 
 import (
+	"sort"
 	"sync"
 )
 
 type ClientMessage struct {
+	client         *Client
 	Topic, Payload []byte
 	QoS, Retain    byte
-	Client         *Client
 	Status         byte
 }
 
-//func (cm *ClientMessage) String() string {
-//	return fmt.Sprintf("%s:%d", cm.Client.ClientId, cm.QoS)
-//}
+func (cm *ClientMessage) Client() *Client {
+	return cm.client
+}
 
 type MessageStore struct {
-	messages map[uint16]*ClientMessage
+	Messages map[uint16]*ClientMessage
 	mutex    sync.RWMutex
 }
 
 func NewMessageStore() *MessageStore {
-	return &MessageStore{messages: map[uint16]*ClientMessage{}}
+	return &MessageStore{Messages: map[uint16]*ClientMessage{}}
 }
 
 func (ms *MessageStore) delete(packetId uint16) {
 	ms.mutex.Lock()
-	delete(ms.messages, packetId)
+	delete(ms.Messages, packetId)
 	ms.mutex.Unlock()
 }
 
@@ -34,7 +35,7 @@ func (ms *MessageStore) Store(packetId uint16, msg *ClientMessage) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
-	ms.messages[packetId] = msg
+	ms.Messages[packetId] = msg
 }
 
 func (ms *MessageStore) Acknowledge(packetId uint16, status byte, delete bool) {
@@ -51,9 +52,40 @@ func (ms *MessageStore) Get(packetId uint16) *ClientMessage {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	if m, ok := ms.messages[packetId]; ok {
+	if m, ok := ms.Messages[packetId]; ok {
 		return m
 	} else {
 		return nil
+	}
+}
+
+func (ms *MessageStore) Range(iterator func(packetId uint16, cm *ClientMessage) bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	for packetId, cm := range ms.Messages {
+		if next := iterator(packetId, cm); !next {
+			return
+		}
+	}
+}
+
+func (ms *MessageStore) RangeSorted(iterator func(packetId uint16, cm *ClientMessage) bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	keys := make([]uint16, 0)
+	for k := range ms.Messages {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, packetId := range keys {
+		if next := iterator(packetId, ms.Messages[packetId]); !next {
+			return
+		}
 	}
 }
