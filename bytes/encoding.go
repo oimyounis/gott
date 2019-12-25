@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+// Encode takes an integer representing Remaining Length and encodes it according to the MQTT spec.
 func Encode(x int) (encoded []byte) {
 	for x > 0 {
 		enc := x % 128
@@ -16,6 +17,8 @@ func Encode(x int) (encoded []byte) {
 	return
 }
 
+// Encode takes an encoded Remaining Length slice of bytes and decodes it into an integer.
+// Returns an additional error if the decoding fails.
 func Decode(stream []byte) (int, error) {
 	mult := 1
 	value := 0
