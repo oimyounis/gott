@@ -22,7 +22,7 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] QoS 1 messages
 - [x] QoS 2 messages
 - [x] Unsubscribe a client when it disconnects (finished but still needs optimizations)
-- [x] Retained messages (reminder: "**#**" subscription needs handling)
+- [x] Retained messages
 - [x] Will messages
 - [x] Sessions
 - [ ] Plugins
