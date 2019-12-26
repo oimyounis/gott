@@ -125,10 +125,9 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 
 	if segsLen == 1 {
 		tl.createOrUpdateSubscription(client, qos)
-		return
+	} else {
+		tl.parseChildren(client, segs[1:], qos)
 	}
-
-	tl.parseChildren(client, segs[1:], qos)
 
 	if topicNames := b.TopicFilterStorage.reverseMatch(filter); topicNames != nil {
 		sort.SliceStable(topicNames, func(i, j int) bool { // spec REQUIRES topics to be "Ordered" by default

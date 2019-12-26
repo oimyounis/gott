@@ -31,7 +31,7 @@ func (tl *topicLevel) deleteSubscription(index int) {
 
 func (tl *topicLevel) reverse(segs [][]byte, matches *[]*topicLevel) {
 	if len(segs) == 0 {
-		if !gob.Equal(tl.Bytes, TopicMultiLevelWildcard) && tl.RetainedMessage != nil {
+		if tl.RetainedMessage != nil {
 			*matches = append(*matches, tl)
 		}
 		return
