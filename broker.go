@@ -25,6 +25,7 @@ type Broker struct {
 	listener           net.Listener
 	clients            map[string]*Client
 	mutex              sync.RWMutex
+	config             Config
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
@@ -39,6 +40,7 @@ func NewBroker(address string) (*Broker, error) {
 		address:            address,
 		listener:           nil,
 		clients:            map[string]*Client{},
+		config:             NewConfig(),
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
