@@ -51,6 +51,8 @@ func NewBroker(address string) (*Broker, error) {
 	}
 	GOTT.SessionStore = ss
 
+	GOTT.bootstrapPlugins()
+
 	return GOTT, nil
 }
 

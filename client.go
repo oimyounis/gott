@@ -247,6 +247,14 @@ loop:
 				}
 			}
 
+			for _, plug := range plugins {
+				if plug.onConnect != nil {
+					if !plug.onConnect(c.ClientID) {
+						break loop
+					}
+				}
+			}
+
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
