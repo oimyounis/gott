@@ -193,8 +193,6 @@ loop:
 					break loop
 				}
 				c.Username = string(username)
-
-				log.Println("username:", c.Username)
 			}
 
 			if connFlags.PasswordFlag {
@@ -219,11 +217,9 @@ loop:
 				c.Password = string(password)
 			}
 
-			if c.Username != "" { // for testing only, should be implemented as a plugin
-				if auth := c.authenticate(); !auth {
-					c.emit(makeConnAckPacket(0, ConnectNotAuthorized))
-					break loop
-				}
+			// Invoke OnConnect handlers of all plugins before initializing sessions
+			if !GOTT.notifyPlugins(eventConnect, c.ClientID, c.Username, c.Password) {
+				break loop
 			}
 
 			var sessionPresent byte
@@ -247,14 +243,6 @@ loop:
 				}
 			}
 
-			for _, plug := range plugins {
-				if plug.onConnect != nil {
-					if !plug.onConnect(c.ClientID) {
-						break loop
-					}
-				}
-			}
-
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
@@ -263,6 +251,10 @@ loop:
 			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
 			c.Session.replay()
+
+			if !GOTT.notifyPlugins(eventConnectSuccess, c.ClientID, c.Username, c.Password) {
+				break loop
+			}
 		case TypePublish:
 			publishFlags, err := extractPublishFlags(flagsBits)
 			if err != nil {
@@ -329,7 +321,13 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
+			if !GOTT.notifyPlugins(eventBeforePublish, c.ClientID, topic, payload, publishFlags.DUP, publishFlags.Retain, publishFlags.QoS) {
+				break
+			}
+
 			GOTT.Publish(topic, payload, publishFlags)
+
+			GOTT.notifyPlugins(eventPublish, c.ClientID, topic, payload, publishFlags.DUP, publishFlags.Retain, publishFlags.QoS)
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -526,12 +524,4 @@ func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
-}
-
-// For test purposes only
-func (c *Client) authenticate() bool { // TODO: implement authentication as a plugin
-	if c.Username == "testuser" && c.Password == "testpass" {
-		return true
-	}
-	return false
 }

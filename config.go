@@ -8,7 +8,7 @@ import (
 	"github.com/olebedev/config"
 )
 
-var defaults map[string]interface{} = map[string]interface{}{
+var defaults = map[string]interface{}{
 	"ConfigPath": "config.yml",
 }
 

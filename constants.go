@@ -52,3 +52,10 @@ const (
 	StatusPubrelReceived
 	StatusPubcompReceived
 )
+
+const (
+	eventConnect = iota
+	eventConnectSuccess
+	eventBeforePublish
+	eventPublish
+)
