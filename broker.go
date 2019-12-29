@@ -26,6 +26,7 @@ type Broker struct {
 	clients            map[string]*Client
 	mutex              sync.RWMutex
 	config             Config
+	plugins            []gottPlugin
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
