@@ -18,6 +18,7 @@ type gottPlugin struct {
 	onBeforeSubscribe   func(clientID, username string, topic []byte, qos byte) bool
 	onSubscribe         func(clientID, username string, topic []byte, qos byte)
 	onBeforeUnsubscribe func(clientID, username string, topic []byte) bool
+	onUnsubscribe       func(clientID, username string, topic []byte)
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -94,6 +95,15 @@ func (b *Broker) bootstrapPlugins() {
 				pluginObj.onBeforeUnsubscribe = f
 			}
 		}
+
+		if h, err = p.Lookup("OnUnsubscribe"); err == nil {
+			f, ok := h.(func(clientID, username string, topic []byte))
+			log.Println("plugin loader OnUnsubscribe", pstring, ok)
+			if ok {
+				pluginObj.onUnsubscribe = f
+			}
+		}
+
 		b.plugins = append(b.plugins, pluginObj)
 	}
 }
@@ -146,4 +156,12 @@ func (b *Broker) invokeOnBeforeUnsubscribe(clientID, username string, topic []by
 	}
 
 	return true
+}
+
+func (b *Broker) invokeOnUnsubscribe(clientID, username string, topic []byte) {
+	for _, p := range b.plugins {
+		if p.onUnsubscribe != nil {
+			p.onUnsubscribe(clientID, username, topic)
+		}
+	}
 }

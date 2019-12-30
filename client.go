@@ -486,6 +486,8 @@ loop:
 				}
 
 				GOTT.Unsubscribe(c, filter)
+
+				GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
 			}
 
 			c.emit(makeUnSubAckPacket(packetIDBytes))
