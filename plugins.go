@@ -16,6 +16,7 @@ type gottPlugin struct {
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
 	onPublish           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 	onBeforeSubscribe   func(clientID, username string, topic []byte, qos byte) bool
+	onSubscribe         func(clientID, username string, topic []byte, qos byte)
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -76,6 +77,14 @@ func (b *Broker) bootstrapPlugins() {
 				pluginObj.onBeforeSubscribe = f
 			}
 		}
+
+		if h, err = p.Lookup("OnSubscribe"); err == nil {
+			f, ok := h.(func(clientID, username string, topic []byte, qos byte))
+			log.Println("plugin loader OnSubscribe", pstring, ok)
+			if ok {
+				pluginObj.onSubscribe = f
+			}
+		}
 		b.plugins = append(b.plugins, pluginObj)
 	}
 }
@@ -108,6 +117,14 @@ func (b *Broker) invokeOnBeforeSubscribe(clientID, username string, topic []byte
 	}
 
 	return true
+}
+
+func (b *Broker) invokeOnSubscribe(clientID, username string, topic []byte, qos byte) {
+	for _, p := range b.plugins {
+		if p.onSubscribe != nil {
+			p.onSubscribe(clientID, username, topic, qos)
+		}
+	}
 }
 	}
 

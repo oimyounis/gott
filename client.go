@@ -443,6 +443,10 @@ loop:
 				if !GOTT.invokeOnBeforeSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS) {
 					continue
 				}
+
+				if ok := GOTT.Subscribe(c, filter.Filter, filter.QoS); ok {
+					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
+				}
 			}
 
 			c.emit(makeSubAckPacket(packetIDBytes, filterList))
