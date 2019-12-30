@@ -321,7 +321,7 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
-			if !GOTT.notifyPlugins(eventBeforePublish, c.ClientID, topic, payload, publishFlags.DUP, publishFlags.Retain, publishFlags.QoS) {
+			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain) {
 				break
 			}
 

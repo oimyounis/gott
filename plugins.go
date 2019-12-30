@@ -13,7 +13,7 @@ type gottPlugin struct {
 	plug             *plugin.Plugin
 	onConnect        func(clientID, username, password string) bool
 	onConnectSuccess func(clientID, username, password string) bool
-	onBeforePublish  func(clientID string, topic, payload []byte, dup, retain, qos byte) bool
+	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
 	onPublish        func(clientID string, topic, payload []byte, dup, retain, qos byte)
 }
 
@@ -53,7 +53,7 @@ func (b *Broker) bootstrapPlugins() {
 		}
 
 		if h, err = p.Lookup("OnBeforePublish"); err == nil {
-			f, ok := h.(func(clientID string, topic, payload []byte, dup, retain, qos byte) bool)
+			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool)
 			log.Println("plugin loader OnBeforePublish", pstring, ok)
 			if ok {
 				pluginObj.onBeforePublish = f
