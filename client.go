@@ -440,7 +440,9 @@ loop:
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 
 			for _, filter := range filterList {
-				GOTT.Subscribe(c, filter.Filter, filter.QoS)
+				if !GOTT.invokeOnBeforeSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS) {
+					continue
+				}
 			}
 
 			c.emit(makeSubAckPacket(packetIDBytes, filterList))
