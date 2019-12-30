@@ -481,6 +481,10 @@ loop:
 			}
 
 			for _, filter := range filterList {
+				if !GOTT.invokeOnBeforeUnsubscribe(c.ClientID, c.Username, filter) {
+					continue
+				}
+
 				GOTT.Unsubscribe(c, filter)
 			}
 
