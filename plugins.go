@@ -9,10 +9,10 @@ import (
 const pluginDir = "plugins"
 
 type gottPlugin struct {
-	name             string
-	plug             *plugin.Plugin
-	onConnect        func(clientID, username, password string) bool
-	onConnectSuccess func(clientID, username, password string) bool
+	name                string
+	plug                *plugin.Plugin
+	onConnect           func(clientID, username, password string) bool
+	onConnectSuccess    func(clientID, username, password string) bool
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
 	onPublish           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 	onBeforeSubscribe   func(clientID, username string, topic []byte, qos byte) bool
@@ -108,24 +108,30 @@ func (b *Broker) bootstrapPlugins() {
 	}
 }
 
-func (b *Broker) notifyPlugins(event int, args ...interface{}) bool {
-	switch event {
-	case eventConnect:
-		for _, p := range GOTT.plugins {
-			if p.onConnect != nil {
-				if !p.onConnect(args[0].(string), args[1].(string), args[2].(string)) {
-					return false
-				}
+func (b *Broker) invokeOnConnect(clientID, username, password string) bool {
+	for _, p := range b.plugins {
+		if p.onConnect != nil {
+			if !p.onConnect(clientID, username, password) {
+				return false
 			}
 		}
-	case eventConnectSuccess:
-		for _, p := range GOTT.plugins {
-			if p.onConnectSuccess != nil {
-				if !p.onConnectSuccess(args[0].(string), args[1].(string), args[2].(string)) {
-					return false
-				}
+	}
+
+	return true
+}
+
+func (b *Broker) invokeOnConnectSuccess(clientID, username, password string) bool {
+	for _, p := range b.plugins {
+		if p.onConnectSuccess != nil {
+			if !p.onConnectSuccess(clientID, username, password) {
+				return false
 			}
 		}
+	}
+
+	return true
+}
+
 func (b *Broker) invokeOnBeforePublish(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool {
 	for _, p := range b.plugins {
 		if p.onBeforePublish != nil {

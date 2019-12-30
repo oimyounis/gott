@@ -218,7 +218,7 @@ loop:
 			}
 
 			// Invoke OnConnect handlers of all plugins before initializing sessions
-			if !GOTT.notifyPlugins(eventConnect, c.ClientID, c.Username, c.Password) {
+			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
 				break loop
 			}
 
@@ -252,7 +252,7 @@ loop:
 
 			c.Session.replay()
 
-			if !GOTT.notifyPlugins(eventConnectSuccess, c.ClientID, c.Username, c.Password) {
+			if !GOTT.invokeOnConnectSuccess(c.ClientID, c.Username, c.Password) {
 				break loop
 			}
 		case TypePublish:
