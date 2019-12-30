@@ -14,7 +14,7 @@ type gottPlugin struct {
 	onConnect        func(clientID, username, password string) bool
 	onConnectSuccess func(clientID, username, password string) bool
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
-	onPublish        func(clientID string, topic, payload []byte, dup, retain, qos byte)
+	onPublish           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -61,7 +61,7 @@ func (b *Broker) bootstrapPlugins() {
 		}
 
 		if h, err = p.Lookup("OnPublish"); err == nil {
-			f, ok := h.(func(clientID string, topic, payload []byte, dup, retain, qos byte))
+			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool))
 			log.Println("plugin loader OnPublish", pstring, ok)
 			if ok {
 				pluginObj.onPublish = f

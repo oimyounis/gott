@@ -327,7 +327,7 @@ loop:
 
 			GOTT.Publish(topic, payload, publishFlags)
 
-			GOTT.notifyPlugins(eventPublish, c.ClientID, topic, payload, publishFlags.DUP, publishFlags.Retain, publishFlags.QoS)
+			GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
