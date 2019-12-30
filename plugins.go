@@ -137,6 +137,15 @@ func (b *Broker) invokeOnBeforePublish(clientID, username string, topic, payload
 
 	return true
 }
+
+func (b *Broker) invokeOnPublish(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) {
+	for _, p := range b.plugins {
+		if p.onPublish != nil {
+			p.onPublish(clientID, username, topic, payload, dup, qos, retain)
+		}
+	}
+}
+
 func (b *Broker) invokeOnBeforeSubscribe(clientID, username string, topic []byte, qos byte) bool {
 	for _, p := range b.plugins {
 		if p.onBeforeSubscribe != nil {
