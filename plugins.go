@@ -126,6 +126,17 @@ func (b *Broker) notifyPlugins(event int, args ...interface{}) bool {
 				}
 			}
 		}
+func (b *Broker) invokeOnBeforePublish(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool {
+	for _, p := range b.plugins {
+		if p.onBeforePublish != nil {
+			if !p.onBeforePublish(clientID, username, topic, payload, dup, qos, retain) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
 func (b *Broker) invokeOnBeforeSubscribe(clientID, username string, topic []byte, qos byte) bool {
 	for _, p := range b.plugins {
 		if p.onBeforeSubscribe != nil {
