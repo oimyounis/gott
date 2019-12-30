@@ -109,16 +109,16 @@ func (b *Broker) handleConnection(conn net.Conn) {
 }
 
 // Subscribe receives a client, a filter and qos level to create or update a subscription.
-func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
+func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 	if !validFilter(filter) {
-		return
+		return false
 	}
 
 	segs := gob.Split(filter, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
-		return
+		return false
 	}
 
 	topLevel := segs[0]
@@ -146,6 +146,8 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 			})
 		}
 	}
+
+	return true
 }
 
 // Unsubscribe receives a client and a filter to remove a subscription.
