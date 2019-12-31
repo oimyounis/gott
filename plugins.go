@@ -2,6 +2,7 @@ package gott
 
 import (
 	"log"
+	"net"
 	"path"
 	"plugin"
 )
@@ -20,6 +21,7 @@ type gottPlugin struct {
 	onSubscribe         func(clientID, username string, topic []byte, qos byte)
 	onBeforeUnsubscribe func(clientID, username string, topic []byte) bool
 	onUnsubscribe       func(clientID, username string, topic []byte)
+	onDisconnect        func(clientID, username string)
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -114,6 +116,13 @@ func (b *Broker) bootstrapPlugins() {
 			}
 		}
 
+		if h, err = p.Lookup("OnDisconnect"); err == nil {
+			f, ok := h.(func(clientID, username string))
+			LogDebug("plugin loader OnDisconnect", pstring, ok)
+			if ok {
+				pluginObj.onDisconnect = f
+			}
+		}
 		b.plugins = append(b.plugins, pluginObj)
 	}
 }
@@ -210,6 +219,14 @@ func (b *Broker) invokeOnUnsubscribe(clientID, username string, topic []byte) {
 	for _, p := range b.plugins {
 		if p.onUnsubscribe != nil {
 			p.onUnsubscribe(clientID, username, topic)
+		}
+	}
+}
+
+func (b *Broker) invokeOnDisconnect(clientID, username string) {
+	for _, p := range b.plugins {
+		if p.onDisconnect != nil {
+			p.onDisconnect(clientID, username)
 		}
 	}
 }

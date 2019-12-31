@@ -511,6 +511,8 @@ func (c *Client) disconnect() {
 		return
 	}
 
+	connected := c.connected
+
 	c.closeConnection()
 	GOTT.removeClient(c.ClientID)
 
@@ -524,6 +526,10 @@ func (c *Client) disconnect() {
 			Retain: c.WillMessage.Retain,
 			QoS:    c.WillMessage.QoS,
 		})
+	}
+
+	if connected {
+		GOTT.invokeOnDisconnect(c.ClientID, c.Username)
 	}
 }
 
