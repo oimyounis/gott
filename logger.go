@@ -10,3 +10,9 @@ func LogBench(v ...interface{}) {
 	printList = append(printList, v...)
 	log.Println(printList...)
 }
+
+func LogDebug(v ...interface{}) {
+	printList := []interface{}{"[DEBUG]"}
+	printList = append(printList, v...)
+	log.Println(printList...)
+}
