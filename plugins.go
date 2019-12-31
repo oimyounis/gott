@@ -70,7 +70,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforePublish"); err == nil {
 			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool)
-			log.Println("plugin loader OnBeforePublish", pstring, ok)
+			LogDebug("plugin loader OnBeforePublish", pstring, ok)
 			if ok {
 				pluginObj.onBeforePublish = f
 			}
@@ -78,7 +78,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnPublish"); err == nil {
 			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool))
-			log.Println("plugin loader OnPublish", pstring, ok)
+			LogDebug("plugin loader OnPublish", pstring, ok)
 			if ok {
 				pluginObj.onPublish = f
 			}
@@ -86,7 +86,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforeSubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte, qos byte) bool)
-			log.Println("plugin loader OnBeforeSubscribe", pstring, ok)
+			LogDebug("plugin loader OnBeforeSubscribe", pstring, ok)
 			if ok {
 				pluginObj.onBeforeSubscribe = f
 			}
@@ -94,7 +94,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnSubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte, qos byte))
-			log.Println("plugin loader OnSubscribe", pstring, ok)
+			LogDebug("plugin loader OnSubscribe", pstring, ok)
 			if ok {
 				pluginObj.onSubscribe = f
 			}
@@ -102,7 +102,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforeUnsubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte) bool)
-			log.Println("plugin loader OnBeforeUnsubscribe", pstring, ok)
+			LogDebug("plugin loader OnBeforeUnsubscribe", pstring, ok)
 			if ok {
 				pluginObj.onBeforeUnsubscribe = f
 			}
@@ -110,7 +110,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnUnsubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte))
-			log.Println("plugin loader OnUnsubscribe", pstring, ok)
+			LogDebug("plugin loader OnUnsubscribe", pstring, ok)
 			if ok {
 				pluginObj.onUnsubscribe = f
 			}
@@ -123,7 +123,10 @@ func (b *Broker) bootstrapPlugins() {
 				pluginObj.onDisconnect = f
 			}
 		}
+
 		b.plugins = append(b.plugins, pluginObj)
+
+		LogDebug("plugin loaded:", pstring)
 	}
 }
 
