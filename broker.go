@@ -218,14 +218,14 @@ func (b *Broker) Retain(msg *message, topic []byte) {
 }
 
 // Publish sends out a payload to all clients with subscriptions on a provided topic given the passed publish flags.
-func (b *Broker) Publish(topic, payload []byte, flags publishFlags) {
+func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
 	if !validTopicName(topic) {
-		return
+		return false
 	}
 
 	matches := b.TopicFilterStorage.match(topic)
-	log.Println(string(topic), "matches", matches)
+	//log.Println(string(topic), "matches", matches)
 
 	if flags.Retain {
 		if len(payload) != 0 {
@@ -272,6 +272,8 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) {
 			}
 		}
 	}
+
+	return true
 }
 
 // PublishRetained is used to publish retained messages to a subscribing client.

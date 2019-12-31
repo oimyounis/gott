@@ -27,10 +27,6 @@ type Client struct {
 }
 
 func (c *Client) listen() {
-	if GOTT == nil {
-		return
-	}
-
 	defer Recover(func(c *Client) func(string, string) {
 		return func(err, stack string) {
 			c.disconnect()
@@ -321,13 +317,13 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
-			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain) {
+			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false) {
 				break
 			}
 
-			GOTT.Publish(topic, payload, publishFlags)
-
-			GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
+			if ok := GOTT.Publish(topic, payload, publishFlags); ok {
+				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
+			}
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
