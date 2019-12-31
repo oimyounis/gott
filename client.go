@@ -252,7 +252,7 @@ loop:
 
 			c.Session.replay()
 
-			if !GOTT.invokeOnConnectSuccess(c.ClientID, c.Username, c.Password) {
+			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
 				break loop
 			}
 		case TypePublish:

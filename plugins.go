@@ -14,7 +14,6 @@ type gottPlugin struct {
 	onSocketOpen        func(conn net.Conn) bool
 	onBeforeConnect     func(clientID, username, password string) bool
 	onConnect           func(clientID, username, password string) bool
-	onConnectSuccess    func(clientID, username, password string) bool
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
 	onPublish           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 	onBeforeSubscribe   func(clientID, username string, topic []byte, qos byte) bool
@@ -59,11 +58,11 @@ func (b *Broker) bootstrapPlugins() {
 			}
 		}
 
-		if h, err = p.Lookup("OnConnectSuccess"); err == nil {
+		if h, err = p.Lookup("OnConnect"); err == nil {
 			f, ok := h.(func(clientID, username, password string) bool)
-			log.Println("plugin loader OnConnectSuccess", pstring, ok)
+			LogDebug("plugin loader OnConnect", pstring, ok)
 			if ok {
-				pluginObj.onConnectSuccess = f
+				pluginObj.onConnect = f
 			}
 		}
 
@@ -143,10 +142,10 @@ func (b *Broker) invokeOnBeforeConnect(clientID, username, password string) bool
 	return true
 }
 
-func (b *Broker) invokeOnConnectSuccess(clientID, username, password string) bool {
+func (b *Broker) invokeOnConnect(clientID, username, password string) bool {
 	for _, p := range b.plugins {
-		if p.onConnectSuccess != nil {
-			if !p.onConnectSuccess(clientID, username, password) {
+		if p.onConnect != nil {
+			if !p.onConnect(clientID, username, password) {
 				return false
 			}
 		}
