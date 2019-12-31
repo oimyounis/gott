@@ -217,8 +217,8 @@ loop:
 				c.Password = string(password)
 			}
 
-			// Invoke OnConnect handlers of all plugins before initializing sessions
-			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
+			// Invoke OnBeforeConnect handlers of all plugins before initializing sessions
+			if !GOTT.invokeOnBeforeConnect(c.ClientID, c.Username, c.Password) {
 				break loop
 			}
 

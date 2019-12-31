@@ -12,6 +12,7 @@ type gottPlugin struct {
 	name                string
 	plug                *plugin.Plugin
 	onSocketOpen        func(conn net.Conn) bool
+	onBeforeConnect     func(clientID, username, password string) bool
 	onConnect           func(clientID, username, password string) bool
 	onConnectSuccess    func(clientID, username, password string) bool
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
@@ -48,10 +49,13 @@ func (b *Broker) bootstrapPlugins() {
 				pluginObj.onSocketOpen = f
 			}
 		}
+
+		h, err = p.Lookup("OnBeforeConnect")
+		if err == nil {
 			f, ok := h.(func(clientID, username, password string) bool)
-			log.Println("plugin loader OnConnect", pstring, ok)
+			LogDebug("plugin loader OnBeforeConnect", pstring, ok)
 			if ok {
-				pluginObj.onConnect = f
+				pluginObj.onBeforeConnect = f
 			}
 		}
 
@@ -126,6 +130,11 @@ func (b *Broker) invokeOnSocketOpen(conn net.Conn) bool {
 
 	return true
 }
+
+func (b *Broker) invokeOnBeforeConnect(clientID, username, password string) bool {
+	for _, p := range b.plugins {
+		if p.onBeforeConnect != nil {
+			if !p.onBeforeConnect(clientID, username, password) {
 				return false
 			}
 		}
