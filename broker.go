@@ -149,6 +149,8 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 				Session: client.Session,
 				QoS:     qos,
 			})
+
+			GOTT.invokeOnPublish(client.ClientID, client.Username, topic.RetainedMessage.Topic, topic.RetainedMessage.Payload, 0, topic.RetainedMessage.QoS, true)
 		}
 	}
 
