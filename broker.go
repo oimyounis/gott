@@ -99,6 +99,11 @@ func (b *Broker) removeClient(clientID string) {
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
+	if !b.invokeOnSocketOpen(conn) {
+		_ = conn.Close()
+		return
+	}
+
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 
 	c := &Client{

@@ -11,6 +11,7 @@ const pluginDir = "plugins"
 type gottPlugin struct {
 	name                string
 	plug                *plugin.Plugin
+	onSocketOpen        func(conn net.Conn) bool
 	onConnect           func(clientID, username, password string) bool
 	onConnectSuccess    func(clientID, username, password string) bool
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
@@ -39,8 +40,14 @@ func (b *Broker) bootstrapPlugins() {
 			}
 		}
 
-		h, err := p.Lookup("OnConnect")
+		h, err := p.Lookup("OnSocketOpen")
 		if err == nil {
+			f, ok := h.(func(conn net.Conn) bool)
+			LogDebug("plugin loader OnSocketOpen", pstring, ok)
+			if ok {
+				pluginObj.onSocketOpen = f
+			}
+		}
 			f, ok := h.(func(clientID, username, password string) bool)
 			log.Println("plugin loader OnConnect", pstring, ok)
 			if ok {
@@ -108,10 +115,17 @@ func (b *Broker) bootstrapPlugins() {
 	}
 }
 
-func (b *Broker) invokeOnConnect(clientID, username, password string) bool {
+func (b *Broker) invokeOnSocketOpen(conn net.Conn) bool {
 	for _, p := range b.plugins {
-		if p.onConnect != nil {
-			if !p.onConnect(clientID, username, password) {
+		if p.onSocketOpen != nil {
+			if !p.onSocketOpen(conn) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
 				return false
 			}
 		}
