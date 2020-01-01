@@ -20,6 +20,7 @@ type Client struct {
 	connected            bool
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
+	gracefulDisconnect   bool
 	ClientID             string
 	WillMessage          *message
 	Username, Password   string
@@ -317,11 +318,13 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
-			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false) {
+			GOTT.invokeOnMessage(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
+
+			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain) {
 				break
 			}
 
-			if ok := GOTT.Publish(topic, payload, publishFlags); ok {
+			if GOTT.Publish(topic, payload, publishFlags) {
 				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
 			}
 		case TypePubAck:
@@ -491,6 +494,7 @@ loop:
 			c.emit(makePingRespPacket())
 		case TypeDisconnect:
 			c.WillMessage = nil // as per [MQTT-3.1.2-10]
+			c.gracefulDisconnect = true
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
@@ -517,15 +521,19 @@ func (c *Client) disconnect() {
 	GOTT.UnsubscribeAll(c)
 
 	if c.WillMessage != nil {
-		// TODO: see [MQTT-3.1.2-10] after implementing sessions
-		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, publishFlags{
-			Retain: c.WillMessage.Retain,
-			QoS:    c.WillMessage.QoS,
-		})
+		if GOTT.invokeOnBeforePublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, c.WillMessage.Retain) {
+			if GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, publishFlags{
+				Retain: c.WillMessage.Retain,
+				QoS:    c.WillMessage.QoS,
+			}) {
+				GOTT.invokeOnPublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, false)
+			}
+		}
+
 	}
 
 	if connected {
-		GOTT.invokeOnDisconnect(c.ClientID, c.Username)
+		GOTT.invokeOnDisconnect(c.ClientID, c.Username, c.gracefulDisconnect)
 	}
 }
 

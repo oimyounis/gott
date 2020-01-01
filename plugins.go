@@ -15,13 +15,14 @@ type gottPlugin struct {
 	onSocketOpen        func(conn net.Conn) bool
 	onBeforeConnect     func(clientID, username, password string) bool
 	onConnect           func(clientID, username, password string) bool
+	onMessage           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 	onBeforePublish     func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool
 	onPublish           func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 	onBeforeSubscribe   func(clientID, username string, topic []byte, qos byte) bool
 	onSubscribe         func(clientID, username string, topic []byte, qos byte)
 	onBeforeUnsubscribe func(clientID, username string, topic []byte) bool
 	onUnsubscribe       func(clientID, username string, topic []byte)
-	onDisconnect        func(clientID, username string)
+	onDisconnect        func(clientID, username string, graceful bool)
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -65,6 +66,14 @@ func (b *Broker) bootstrapPlugins() {
 			LogDebug("plugin loader OnConnect", pstring, ok)
 			if ok {
 				pluginObj.onConnect = f
+			}
+		}
+
+		if h, err = p.Lookup("OnMessage"); err == nil {
+			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool))
+			LogDebug("plugin loader OnMessage", pstring, ok)
+			if ok {
+				pluginObj.onMessage = f
 			}
 		}
 
@@ -117,7 +126,7 @@ func (b *Broker) bootstrapPlugins() {
 		}
 
 		if h, err = p.Lookup("OnDisconnect"); err == nil {
-			f, ok := h.(func(clientID, username string))
+			f, ok := h.(func(clientID, username string, graceful bool))
 			LogDebug("plugin loader OnDisconnect", pstring, ok)
 			if ok {
 				pluginObj.onDisconnect = f
@@ -164,6 +173,14 @@ func (b *Broker) invokeOnConnect(clientID, username, password string) bool {
 	}
 
 	return true
+}
+
+func (b *Broker) invokeOnMessage(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) {
+	for _, p := range b.plugins {
+		if p.onMessage != nil {
+			p.onMessage(clientID, username, topic, payload, dup, qos, retain)
+		}
+	}
 }
 
 func (b *Broker) invokeOnBeforePublish(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool {
@@ -226,10 +243,10 @@ func (b *Broker) invokeOnUnsubscribe(clientID, username string, topic []byte) {
 	}
 }
 
-func (b *Broker) invokeOnDisconnect(clientID, username string) {
+func (b *Broker) invokeOnDisconnect(clientID, username string, graceful bool) {
 	for _, p := range b.plugins {
 		if p.onDisconnect != nil {
-			p.onDisconnect(clientID, username)
+			p.onDisconnect(clientID, username, graceful)
 		}
 	}
 }
