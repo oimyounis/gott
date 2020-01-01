@@ -11,6 +11,7 @@ func LogBench(v ...interface{}) {
 	log.Println(printList...)
 }
 
+// LogDebug logs to stdout with a timestamp and a "[DEBUG]" prefix.
 func LogDebug(v ...interface{}) {
 	printList := []interface{}{"[DEBUG]"}
 	printList = append(printList, v...)
