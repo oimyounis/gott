@@ -1,8 +1,10 @@
 package gott
 
 import (
+	"gott/utils"
 	"log"
 	"net"
+	"os"
 	"path"
 	"plugin"
 )
@@ -26,6 +28,12 @@ type gottPlugin struct {
 }
 
 func (b *Broker) bootstrapPlugins() {
+	if !utils.PathExists(pluginDir) {
+		log.Println("Plugins directory does not exist. Creating a new one.")
+		if err := os.Mkdir(pluginDir, 0775); err != nil {
+			log.Fatalln("Failed to create the plugins directory:", err)
+		}
+	}
 	for _, pstring := range b.config.Plugins {
 		p, err := plugin.Open(path.Join(pluginDir, pstring))
 		if err != nil {
