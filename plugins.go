@@ -37,7 +37,8 @@ func (b *Broker) bootstrapPlugins() {
 	for _, pstring := range b.config.Plugins {
 		p, err := plugin.Open(path.Join(pluginDir, pstring))
 		if err != nil {
-			log.Fatalf("Error loading plugin %s: %v", pstring, err)
+			log.Printf("Skipping loading plugin %s: %v", pstring, err)
+			continue
 		}
 
 		pluginObj := gottPlugin{
