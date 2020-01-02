@@ -55,5 +55,6 @@ const (
 
 const (
 	pluginDir            = "plugins"
-	defaultConfigContent = `plugins:`
+	defaultConfigContent = `plugins:
+#  - myplugin.so`
 )
