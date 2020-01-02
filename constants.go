@@ -55,4 +55,5 @@ const (
 
 const (
 	pluginDir            = "plugins"
+	defaultConfigContent = `plugins:`
 )

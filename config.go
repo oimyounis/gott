@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/olebedev/config"
 )
@@ -20,7 +21,11 @@ type Config struct {
 func (c *Config) LoadConfig() {
 	file, err := ioutil.ReadFile(c.ConfigPath)
 	if err != nil {
-		log.Fatalln(fmt.Sprintf("Error opening config file: %v", err))
+		log.Println("Error opening config file:", err)
+		log.Println("Creating default config.yml file")
+		if err = ioutil.WriteFile("config.yml", []byte(defaultConfigContent), 0664); err != nil {
+			log.Fatalln("Error creating default config.yml file:", err)
+		}
 	}
 
 	cfg, err := config.ParseYamlBytes(file)
@@ -29,7 +34,12 @@ func (c *Config) LoadConfig() {
 	}
 
 	if plugins, err := cfg.List("plugins"); err != nil {
-		log.Println("Error parsing plugins:", err)
+		if strings.Contains(fmt.Sprintf("%s", err), "Type mismatch") ||
+			strings.Contains(fmt.Sprintf("%s", err), "Invalid type") {
+			log.Println("Plugins skipped: plugins property is either empty or of incorrect type. Expecting array/list of plugin names.")
+		} else {
+			log.Println("Couldn't parse plugins property:", err)
+		}
 	} else {
 		for _, plugin := range plugins {
 			if p, ok := plugin.(string); !ok {
