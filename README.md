@@ -10,11 +10,10 @@ It needs a lot of optimizations and improvements to be functional and usable for
 **Hopefully with your contribution we could build something great!**
 
 ## Project Status
-### Under Development
-- GOTT is currently in a very early stage and is under heavy development. It is not stable or complete enough to be used in production.
-- Currently implementing the MQTT v3.1.1 spec.
+### In BETA
+- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement and more testing & optimizing are needed.
 
-### Planned for v1
+### Planned for v1 (MQTT v3.1.1)
 - [x] Ping (client -> server)
 - [x] Topic filtering with wildcards support
 - [x] Subscriptions
