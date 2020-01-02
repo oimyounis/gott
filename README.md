@@ -4,7 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
 ![GitHub](https://img.shields.io/github/license/oimyounis/gott)
 
-GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance pluggable broker with most of the features that could be embedded in a broker available out of the box.  
+GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box.  
   
 It needs a lot of optimizations and improvements to be functional and usable for production.  
 **Hopefully with your contribution we could build something great!**
@@ -25,7 +25,7 @@ It needs a lot of optimizations and improvements to be functional and usable for
 - [x] Retained messages
 - [x] Will messages
 - [x] Sessions
-- [ ] Plugins
+- [x] Plugins
 
 ### Planned for v2
 - [ ] MQTT v5
@@ -40,7 +40,9 @@ It needs a lot of optimizations and improvements to be functional and usable for
 1. Run `go get -u github.com/google/uuid`
 2. Run `go get -u github.com/dgraph-io/badger`
 3. Run `go get -u github.com/json-iterator/go`
-4. Clone/download this repo and build/run `main/main.go`
+4. Clone/download this repo
+5. Run `cd main` inside the project's directory
+6. Run `go run main.go`
 
 ## License
 Apache License 2.0, see LICENSE.

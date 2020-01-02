@@ -25,6 +25,8 @@ type Broker struct {
 	listener           net.Listener
 	clients            map[string]*Client
 	mutex              sync.RWMutex
+	config             Config
+	plugins            []gottPlugin
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
@@ -39,6 +41,7 @@ func NewBroker(address string) (*Broker, error) {
 		address:            address,
 		listener:           nil,
 		clients:            map[string]*Client{},
+		config:             NewConfig(),
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
@@ -48,6 +51,8 @@ func NewBroker(address string) (*Broker, error) {
 		return nil, err
 	}
 	GOTT.SessionStore = ss
+
+	GOTT.bootstrapPlugins()
 
 	return GOTT, nil
 }
@@ -94,6 +99,11 @@ func (b *Broker) removeClient(clientID string) {
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
+	if !b.invokeOnSocketOpen(conn) {
+		_ = conn.Close()
+		return
+	}
+
 	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 
 	c := &Client{
@@ -104,16 +114,16 @@ func (b *Broker) handleConnection(conn net.Conn) {
 }
 
 // Subscribe receives a client, a filter and qos level to create or update a subscription.
-func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
+func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 	if !validFilter(filter) {
-		return
+		return false
 	}
 
 	segs := gob.Split(filter, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
-		return
+		return false
 	}
 
 	topLevel := segs[0]
@@ -139,8 +149,12 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) {
 				Session: client.Session,
 				QoS:     qos,
 			})
+
+			GOTT.invokeOnPublish(client.ClientID, client.Username, topic.RetainedMessage.Topic, topic.RetainedMessage.Payload, 0, topic.RetainedMessage.QoS, true)
 		}
 	}
+
+	return true
 }
 
 // Unsubscribe receives a client and a filter to remove a subscription.
@@ -204,14 +218,14 @@ func (b *Broker) Retain(msg *message, topic []byte) {
 }
 
 // Publish sends out a payload to all clients with subscriptions on a provided topic given the passed publish flags.
-func (b *Broker) Publish(topic, payload []byte, flags publishFlags) {
+func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 	// NOTE: the server never upgrades QoS levels, downgrades only when necessary as in Min(pub.QoS, sub.QoS)
 	if !validTopicName(topic) {
-		return
+		return false
 	}
 
 	matches := b.TopicFilterStorage.match(topic)
-	log.Println(string(topic), "matches", matches)
+	//log.Println(string(topic), "matches", matches)
 
 	if flags.Retain {
 		if len(payload) != 0 {
@@ -258,6 +272,8 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) {
 			}
 		}
 	}
+
+	return true
 }
 
 // PublishRetained is used to publish retained messages to a subscribing client.

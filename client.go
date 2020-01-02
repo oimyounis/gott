@@ -20,6 +20,7 @@ type Client struct {
 	connected            bool
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
+	gracefulDisconnect   bool
 	ClientID             string
 	WillMessage          *message
 	Username, Password   string
@@ -27,10 +28,6 @@ type Client struct {
 }
 
 func (c *Client) listen() {
-	if GOTT == nil {
-		return
-	}
-
 	defer Recover(func(c *Client) func(string, string) {
 		return func(err, stack string) {
 			c.disconnect()
@@ -193,8 +190,6 @@ loop:
 					break loop
 				}
 				c.Username = string(username)
-
-				log.Println("username:", c.Username)
 			}
 
 			if connFlags.PasswordFlag {
@@ -219,11 +214,9 @@ loop:
 				c.Password = string(password)
 			}
 
-			if c.Username != "" { // for testing only, should be implemented as a plugin
-				if auth := c.authenticate(); !auth {
-					c.emit(makeConnAckPacket(0, ConnectNotAuthorized))
-					break loop
-				}
+			// Invoke OnBeforeConnect handlers of all plugins before initializing sessions
+			if !GOTT.invokeOnBeforeConnect(c.ClientID, c.Username, c.Password) {
+				break loop
 			}
 
 			var sessionPresent byte
@@ -255,6 +248,10 @@ loop:
 			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
 			c.Session.replay()
+
+			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
+				break loop
+			}
 		case TypePublish:
 			publishFlags, err := extractPublishFlags(flagsBits)
 			if err != nil {
@@ -321,7 +318,15 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
-			GOTT.Publish(topic, payload, publishFlags)
+			GOTT.invokeOnMessage(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
+
+			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain) {
+				break
+			}
+
+			if GOTT.Publish(topic, payload, publishFlags) {
+				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
+			}
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -434,7 +439,13 @@ loop:
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 
 			for _, filter := range filterList {
-				GOTT.Subscribe(c, filter.Filter, filter.QoS)
+				if !GOTT.invokeOnBeforeSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS) {
+					continue
+				}
+
+				if ok := GOTT.Subscribe(c, filter.Filter, filter.QoS); ok {
+					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
+				}
 			}
 
 			c.emit(makeSubAckPacket(packetIDBytes, filterList))
@@ -469,7 +480,13 @@ loop:
 			}
 
 			for _, filter := range filterList {
+				if !GOTT.invokeOnBeforeUnsubscribe(c.ClientID, c.Username, filter) {
+					continue
+				}
+
 				GOTT.Unsubscribe(c, filter)
+
+				GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
 			}
 
 			c.emit(makeUnSubAckPacket(packetIDBytes))
@@ -477,6 +494,7 @@ loop:
 			c.emit(makePingRespPacket())
 		case TypeDisconnect:
 			c.WillMessage = nil // as per [MQTT-3.1.2-10]
+			c.gracefulDisconnect = true
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
@@ -493,6 +511,8 @@ func (c *Client) disconnect() {
 		return
 	}
 
+	connected := c.connected
+
 	c.closeConnection()
 	GOTT.removeClient(c.ClientID)
 
@@ -501,11 +521,19 @@ func (c *Client) disconnect() {
 	GOTT.UnsubscribeAll(c)
 
 	if c.WillMessage != nil {
-		// TODO: see [MQTT-3.1.2-10] after implementing sessions
-		GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, publishFlags{
-			Retain: c.WillMessage.Retain,
-			QoS:    c.WillMessage.QoS,
-		})
+		if GOTT.invokeOnBeforePublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, c.WillMessage.Retain) {
+			if GOTT.Publish(c.WillMessage.Topic, c.WillMessage.Payload, publishFlags{
+				Retain: c.WillMessage.Retain,
+				QoS:    c.WillMessage.QoS,
+			}) {
+				GOTT.invokeOnPublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, false)
+			}
+		}
+
+	}
+
+	if connected {
+		GOTT.invokeOnDisconnect(c.ClientID, c.Username, c.gracefulDisconnect)
 	}
 }
 
@@ -518,12 +546,4 @@ func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}
-}
-
-// For test purposes only
-func (c *Client) authenticate() bool { // TODO: implement authentication as a plugin
-	if c.Username == "testuser" && c.Password == "testpass" {
-		return true
-	}
-	return false
 }
