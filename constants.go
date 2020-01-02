@@ -52,3 +52,7 @@ const (
 	StatusPubrelReceived
 	StatusPubcompReceived
 )
+
+const (
+	pluginDir            = "plugins"
+)

@@ -9,8 +9,6 @@ import (
 	"plugin"
 )
 
-const pluginDir = "plugins"
-
 type gottPlugin struct {
 	name                string
 	plug                *plugin.Plugin
