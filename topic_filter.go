@@ -130,20 +130,21 @@ func (tl *topicLevel) parseChildrenRetain(msg *message, children [][]byte) {
 	l.parseChildrenRetain(msg, children[1:])
 }
 
-func (tl *topicLevel) traverseDelete(client *Client, children [][]byte) {
+func (tl *topicLevel) traverseDelete(client *Client, children [][]byte) bool {
 	childrenLen := len(children)
 	if childrenLen == 0 {
-		return
+		return false
 	}
 
 	if l := tl.find(children[0]); l != nil {
 		if childrenLen == 1 {
-			l.DeleteSubscription(client, true)
-			return
+			return l.DeleteSubscription(client, true)
 		}
 
-		l.traverseDelete(client, children[1:])
+		return l.traverseDelete(client, children[1:])
 	}
+
+	return false
 }
 
 func (tl *topicLevel) traverseDeleteAll(client *Client) {
@@ -208,7 +209,7 @@ func (tl *topicLevel) createOrUpdateSubscription(client *Client, qos byte) {
 }
 
 // DeleteSubscription removes a client's subscription from the Topic Level.
-func (tl *topicLevel) DeleteSubscription(client *Client, graceful bool) {
+func (tl *topicLevel) DeleteSubscription(client *Client, graceful bool) bool {
 	for i, sub := range tl.Subscriptions {
 		if sub.Session.ID == client.ClientID {
 			if graceful || client.Session.clean {
@@ -216,9 +217,10 @@ func (tl *topicLevel) DeleteSubscription(client *Client, graceful bool) {
 			} else {
 				sub.Session.client = nil
 			}
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // Print outputs the Topic Level's path, subscriptions and the retained message in string form.

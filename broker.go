@@ -158,26 +158,27 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 }
 
 // Unsubscribe receives a client and a filter to remove a subscription.
-func (b *Broker) Unsubscribe(client *Client, filter []byte) {
+func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
 	if !validFilter(filter) {
-		return
+		return false
 	}
 
 	segs := gob.Split(filter, TopicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
-		return
+		return false
 	}
 
 	if tl := b.TopicFilterStorage.find(segs[0]); tl != nil {
 		if segsLen == 1 {
-			tl.DeleteSubscription(client, true)
-			return
+			return tl.DeleteSubscription(client, true)
 		}
 
-		tl.traverseDelete(client, segs[1:])
+		return tl.traverseDelete(client, segs[1:])
 	}
+
+	return false
 }
 
 // UnsubscribeAll is used to remove all subscriptions of a client.
