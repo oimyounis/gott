@@ -443,7 +443,7 @@ loop:
 					continue
 				}
 
-				if ok := GOTT.Subscribe(c, filter.Filter, filter.QoS); ok {
+				if GOTT.Subscribe(c, filter.Filter, filter.QoS) {
 					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
 				}
 			}
@@ -484,9 +484,9 @@ loop:
 					continue
 				}
 
-				GOTT.Unsubscribe(c, filter)
-
-				GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
+				if GOTT.Unsubscribe(c, filter) {
+					GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
+				}
 			}
 
 			c.emit(makeUnSubAckPacket(packetIDBytes))
