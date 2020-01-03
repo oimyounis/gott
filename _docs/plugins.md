@@ -19,9 +19,9 @@ We will build a simple plugin that limits subscription count per client ID.
 First, we'll implement a small `limiter` struct to make our job easier:
 
 ```go
-type limiter struct{
+type limiter struct {
 	record map[string]int
-	max int
+	max    int
 }
 ```
 
