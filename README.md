@@ -11,7 +11,7 @@ It needs a lot of optimizations and improvements to be functional and usable for
 
 ## Project Status
 ### In BETA
-- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement and more testing & optimizing are needed.
+- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement. More tests and optimizations are needed.
 
 ### Planned for v1 (MQTT v3.1.1)
 - [x] Ping (client -> server)
