@@ -128,9 +128,9 @@ package main
 
 import "log"
 
-type limiter struct{
+type limiter struct {
 	record map[string]int
-	max int
+	max    int
 }
 
 func newLimiter(max int) limiter {
