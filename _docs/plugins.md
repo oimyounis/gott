@@ -1,8 +1,31 @@
 # GOTT Plugins
 
+**Table of content:**  
+- [Introduction](#introduction)
+- [Tutorial](#tutorial)  
+  - [Implementing The Plugin](#implementing-the-plugin)
+  - [Building The Plugin](#building-the-plugin)
+  - [Loading The Plugin](#loading-the-plugin)
+  - [Notes](#notes)
+  - [The Complete Code](#the-complete-code)
+- [Documentation](#documentation)
+  - [Plugin Loading](#plugin-loading)
+  - [Events And Hooks](#events-and-hooks)
+    - [SocketOpen Event](#socketopen-event)
+    - [BeforeConnect Event](#beforeconnect-event)
+    - [Connect Event](#connect-event)
+    - [Message Event](#message-event)
+    - [BeforePublish Event](#beforepublish-event)
+    - [Publish Event](#publish-event)
+    - [BeforeSubscribe Event](#beforesubscribe-event)
+    - [Subscribe Event](#subscribe-event)
+    - [BeforeUnsubscribe Event](#beforeunsubscribe-event)
+    - [Unsubscribe Event](#unsubscribe-event)
+    - [Disconnect Event](#disconnect-event)
+
+## Introduction
 Writing a GOTT plugin is easy yet powerful.  
-GOTT plugins are typical Go plugins that require zero dependencies.  
-They utilize a hooking system where you hook your code to certain events such as `OnConnect`, `OnSubscribe` and others.  
+GOTT plugins are typical Go plugins that require zero dependencies. They utilize a hooking system where you hook your code to certain events such as *SocketOpen*, *Connect*, *Subscribe* and others (check out the [Events And Hooks](#events-and-hooks) section for the full list).  
 
 ## Tutorial
 We will build a simple plugin that limits subscription count per client ID.  
@@ -242,4 +265,40 @@ Invoked when the Broker successfully publishes a received message. Will be ignor
 func OnPublish(clientID, username string, topic, payload []byte, dup, qos byte, retain bool)
 ```
 The `OnPublish` hook is also passed the above argument list as received by the publisher of the original message.
+
+#### BeforeSubscribe Event
+Invoked when the Broker receives a SUBSCRIBE packet from a client before registering the subscription.
+```go
+func OnBeforeSubscribe(clientID, username string, topic []byte, qos byte) bool
+```
+The `OnBeforeSubscribe` hook receives the above argument list and returns a `bool` to indicate whether to accept and process the subscription or to skip it. If a packet contains multiple subscriptions, this hook will be invoked for each subscription individually. Acknowledgements are not affected and will be sent back regardless of the returned value.
+
+#### Subscribe Event
+Invoked after registering the subscription successfully.
+```go
+func OnSubscribe(clientID, username string, topic []byte, qos byte)
+```
+Receives the above argument list and has no return value. Will be ignored if `false` was returned by the `OnBeforeSubscribe` hook of *any loaded plugin*. Invoked for each subscription individually if multiple subscriptions were received in the same packet.
+
+#### BeforeUnsubscribe Event
+Invoked when the Broker receives a UNSUBSCRIBE packet from a client.
+```go
+func OnBeforeUnsubscribe(clientID, username string, topic []byte) bool
+```
+Same as for the `OnBeforeSubscribe` hook, this hook receives the above argument list indicating whether to accept and process the unsubscription or to pass it. Acknowledgements are not affected by the return value.
+
+#### Unsubscribe Event
+Invoked when an unsubscription is successful and follows the *BeforeUnsubscribe* event.
+```go
+func OnUnsubscribe(clientID, username string, topic []byte)
+```
+Receives the same argument as the `OnBeforeUnsubscribe` hook but has no return value. Will be ignored if `false` was returned by the `OnBeforeUnsubscribe` hook of *any loaded plugin*.
+
+#### Disconnect Event
+Invoked on the disconnection of a client.
+```go
+func OnDisconnect(clientID, username string, graceful bool)
+```
+Receives the above argument list and has no return value. The `graceful` argument is set to `true` if the client was disconnected on its own will (by sending a DISCONNECT packet) and set to `false` if it was disconnected because of a network failure, a malformed packet or any type of error that would cause the connection to terminate.
+
 
