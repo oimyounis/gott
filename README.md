@@ -43,8 +43,13 @@ It needs a lot of optimizations and improvements to be functional and usable for
 5. Run `cd main` inside the project's directory
 6. Run `go run main.go`
 
+## Plugins
+GOTT implements a plugin system that is very easy to work with. You can easily build your own plugin that does whatever you want.  
+  
+Start by reading the [plugins documentation](_docs/plugins.md).
+
 ## License
-Apache License 2.0, see LICENSE.
+Apache License 2.0, see [LICENSE](LICENSE).
 
 ## Contribution
 You are very welcome to submit a new feature, fix a bug, an optimization to the code, report a bug or even a benchmark would be helpful.  
