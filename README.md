@@ -5,8 +5,7 @@
 ![GitHub](https://img.shields.io/github/license/oimyounis/gott)
 
 GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box.  
-  
-It needs a lot of optimizations and improvements to be functional and usable for production.  
+    
 **Hopefully with your contribution we could build something great!**
 
 ## Project Status
