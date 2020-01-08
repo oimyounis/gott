@@ -10,8 +10,7 @@ type sessionStore struct {
 }
 
 func loadSessionStore() (*sessionStore, error) {
-	opts := badger.DefaultOptions(".sessions.store")
-	opts.EventLogging = false
+	opts := badger.DefaultOptions(".sessions.store").WithEventLogging(false)
 
 	db, err := badger.Open(opts)
 	if err != nil {
