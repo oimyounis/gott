@@ -34,13 +34,18 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 ### Known Issues
 - Restarting the broker will reset existing subscriptions. They are not saved to disk (sessions are saved to disk but subscriptions are not restored on broker restart).
 
-## Installation
-1. Run `go get -u github.com/google/uuid`
-2. Run `go get -u github.com/dgraph-io/badger`
-3. Run `go get -u github.com/json-iterator/go`
-4. Clone/download this repo
-5. Run `cd main` inside the project's directory
-6. Run `go run main.go`
+## Quick Start
+1. Install dependencies:  
+```shell script
+$ go get -u github.com/google/uuid
+$ go get -u github.com/dgraph-io/badger
+$ go get -u github.com/json-iterator/go
+$ go get -u go.uber.org/zap
+$ go get -u gopkg.in/natefinch/lumberjack.v2
+```
+2. Clone/download this repo.
+3. Run `cd main` inside the project's directory.
+4. Run `go run main.go`.
 
 ## Plugins
 GOTT implements a plugin system that is very easy to work with. You can easily build your own plugin that does whatever you want.  
