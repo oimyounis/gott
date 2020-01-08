@@ -1,9 +1,5 @@
 package gott
 
-import (
-	"time"
-)
-
 type session struct {
 	client       *Client
 	clean        bool
@@ -21,18 +17,18 @@ func newSession(client *Client, cleanFlag bool) *session {
 }
 
 func (s *session) load() error {
-	start := time.Now()
+	//start := time.Now()
 	err := GOTT.SessionStore.get(s.ID, s)
-	end := time.Since(start)
-	LogBench("session load took:", end)
+	//end := time.Since(start)
+	//LogBench("session load took:", end)
 	return err
 }
 
 func (s *session) put() error {
-	start := time.Now()
+	//start := time.Now()
 	err := GOTT.SessionStore.set(s.ID, s)
-	end := time.Since(start)
-	LogBench("session put took:", end)
+	//end := time.Since(start)
+	//LogBench("session put took:", end)
 	return err
 }
 

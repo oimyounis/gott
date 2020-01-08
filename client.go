@@ -10,6 +10,8 @@ import (
 	"net"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/google/uuid"
 )
 
@@ -46,7 +48,7 @@ loop:
 
 		_, err := sockBuffer.Read(fixedHeader)
 		if err != nil {
-			log.Println("fixedHeader read error", err)
+			//log.Println("fixedHeader read error", err)
 			break
 		}
 
@@ -56,7 +58,7 @@ loop:
 		for lastByte >= 128 {
 			lastByte, err = sockBuffer.ReadByte()
 			if err != nil {
-				log.Println("read error", err)
+				//log.Println("read error", err)
 				break loop
 			}
 			remLenEncoded = append(remLenEncoded, lastByte)
@@ -232,7 +234,7 @@ loop:
 					_ = GOTT.SessionStore.delete(c.ClientID)
 				}
 
-				log.Printf("session for id: %s, session: %#v", c.ClientID, c.Session)
+				//log.Printf("session for id: %s, session: %#v", c.ClientID, c.Session)
 			} else {
 				if err := c.Session.put(); err != nil {
 					log.Println("error putting session to store:", err)
@@ -243,7 +245,7 @@ loop:
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
-			log.Println("client connected with id:", c.ClientID)
+			//log.Println("client connected with id:", c.ClientID)
 			GOTT.addClient(c)
 			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
@@ -327,6 +329,8 @@ loop:
 			if GOTT.Publish(topic, payload, publishFlags) {
 				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
 			}
+
+			GOTT.logger.Debug("publish", zap.ByteString("topic", topic), zap.ByteString("payload", payload), zap.Int("qos", int(publishFlags.QoS)))
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")

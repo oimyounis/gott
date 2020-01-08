@@ -9,6 +9,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -27,6 +29,7 @@ type Broker struct {
 	mutex              sync.RWMutex
 	config             Config
 	plugins            []gottPlugin
+	logger             *zap.Logger
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
@@ -42,6 +45,7 @@ func NewBroker(address string) (*Broker, error) {
 		listener:           nil,
 		clients:            map[string]*Client{},
 		config:             NewConfig(),
+		logger:             NewLogger(),
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
@@ -66,7 +70,7 @@ func (b *Broker) Listen() error {
 	defer l.Close()
 
 	b.listener = l
-	log.Println("Broker listening on " + b.listener.Addr().String())
+	b.logger.Debug("Broker listening on " + b.listener.Addr().String())
 
 	for {
 		conn, err := b.listener.Accept()
@@ -104,7 +108,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		return
 	}
 
-	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
+	//log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 
 	c := &Client{
 		connection: conn,

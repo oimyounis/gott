@@ -3,7 +3,6 @@ package gott
 import (
 	"encoding/binary"
 	"gott/bytes"
-	"log"
 )
 
 var packetSeq = &sequencer{UpperBoundBits: 16, Start: 1}
@@ -43,19 +42,19 @@ func makeSubAckPacket(id []byte, filterList []filter) []byte {
 			packet = append(packet, SubackFailureCode)
 		}
 	}
-	log.Println("SUBACK", packet)
+	//log.Println("SUBACK", packet)
 	return packet
 }
 
 func makeUnSubAckPacket(id []byte) []byte {
 	packet := []byte{TypeUnsubAck << 4, UnsubackRemLen, id[0], id[1]}
-	log.Println("UNSUBACK", packet)
+	//log.Println("UNSUBACK", packet)
 	return packet
 }
 
 func makePingRespPacket() []byte {
 	packet := []byte{TypePingResp << 4, PingrespRemLen}
-	log.Println("PINGRESP", packet)
+	//log.Println("PINGRESP", packet)
 	return packet
 }
 

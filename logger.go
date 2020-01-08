@@ -1,19 +1,38 @@
 package gott
 
 import (
-	"log"
+	"net/url"
+
+	"go.uber.org/zap"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// LogBench logs to stdout with a timestamp and a "[BENCHMARK]" prefix.
-func LogBench(v ...interface{}) {
-	printList := []interface{}{"[BENCHMARK]"}
-	printList = append(printList, v...)
-	log.Println(printList...)
+type lumberjackSink struct {
+	*lumberjack.Logger
 }
 
-// LogDebug logs to stdout with a timestamp and a "[DEBUG]" prefix.
-func LogDebug(v ...interface{}) {
-	printList := []interface{}{"[DEBUG]"}
-	printList = append(printList, v...)
-	log.Println(printList...)
+// Sync implements zap.Sink. The remaining methods are implemented
+// by the embedded *lumberjack.Logger.
+func (lumberjackSink) Sync() error { return nil }
+
+// NewLogger initializes a new zap.Logger with lumberjack support
+// to write to log files with rotation.
+func NewLogger() *zap.Logger {
+	_ = zap.RegisterSink("lumberjack", func(u *url.URL) (zap.Sink, error) {
+		return lumberjackSink{
+			Logger: &lumberjack.Logger{
+				Filename:   u.Opaque,
+				MaxSize:    20, // megabytes
+				MaxBackups: 30,
+				MaxAge:     30, //days
+				Compress:   true,
+			},
+		}, nil
+	})
+
+	config := zap.NewDevelopmentConfig()
+	config.OutputPaths = []string{"lumberjack:logs/gott.log"}
+
+	logger, _ := config.Build()
+	return logger
 }

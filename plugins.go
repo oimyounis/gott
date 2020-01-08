@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"plugin"
+
+	"go.uber.org/zap"
 )
 
 type gottPlugin struct {
@@ -53,7 +55,7 @@ func (b *Broker) bootstrapPlugins() {
 		h, err := p.Lookup("OnSocketOpen")
 		if err == nil {
 			f, ok := h.(func(conn net.Conn) bool)
-			LogDebug("plugin loader OnSocketOpen", pstring, ok)
+			b.logger.Debug("plugin loader OnSocketOpen", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onSocketOpen = f
 			}
@@ -62,7 +64,7 @@ func (b *Broker) bootstrapPlugins() {
 		h, err = p.Lookup("OnBeforeConnect")
 		if err == nil {
 			f, ok := h.(func(clientID, username, password string) bool)
-			LogDebug("plugin loader OnBeforeConnect", pstring, ok)
+			b.logger.Debug("plugin loader OnBeforeConnect", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onBeforeConnect = f
 			}
@@ -70,7 +72,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnConnect"); err == nil {
 			f, ok := h.(func(clientID, username, password string) bool)
-			LogDebug("plugin loader OnConnect", pstring, ok)
+			b.logger.Debug("plugin loader OnConnect", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onConnect = f
 			}
@@ -78,7 +80,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnMessage"); err == nil {
 			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool))
-			LogDebug("plugin loader OnMessage", pstring, ok)
+			b.logger.Debug("plugin loader OnMessage", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onMessage = f
 			}
@@ -86,7 +88,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforePublish"); err == nil {
 			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool) bool)
-			LogDebug("plugin loader OnBeforePublish", pstring, ok)
+			b.logger.Debug("plugin loader OnBeforePublish", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onBeforePublish = f
 			}
@@ -94,7 +96,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnPublish"); err == nil {
 			f, ok := h.(func(clientID, username string, topic, payload []byte, dup, qos byte, retain bool))
-			LogDebug("plugin loader OnPublish", pstring, ok)
+			b.logger.Debug("plugin loader OnPublish", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onPublish = f
 			}
@@ -102,7 +104,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforeSubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte, qos byte) bool)
-			LogDebug("plugin loader OnBeforeSubscribe", pstring, ok)
+			b.logger.Debug("plugin loader OnBeforeSubscribe", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onBeforeSubscribe = f
 			}
@@ -110,7 +112,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnSubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte, qos byte))
-			LogDebug("plugin loader OnSubscribe", pstring, ok)
+			b.logger.Debug("plugin loader OnSubscribe", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onSubscribe = f
 			}
@@ -118,7 +120,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnBeforeUnsubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte) bool)
-			LogDebug("plugin loader OnBeforeUnsubscribe", pstring, ok)
+			b.logger.Debug("plugin loader OnBeforeUnsubscribe", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onBeforeUnsubscribe = f
 			}
@@ -126,7 +128,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnUnsubscribe"); err == nil {
 			f, ok := h.(func(clientID, username string, topic []byte))
-			LogDebug("plugin loader OnUnsubscribe", pstring, ok)
+			b.logger.Debug("plugin loader OnUnsubscribe", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onUnsubscribe = f
 			}
@@ -134,7 +136,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("OnDisconnect"); err == nil {
 			f, ok := h.(func(clientID, username string, graceful bool))
-			LogDebug("plugin loader OnDisconnect", pstring, ok)
+			b.logger.Debug("plugin loader OnDisconnect", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.onDisconnect = f
 			}
@@ -142,7 +144,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		b.plugins = append(b.plugins, pluginObj)
 
-		LogDebug("plugin loaded:", pstring)
+		b.logger.Debug("plugin loaded", zap.String("name", pstring))
 	}
 }
 
