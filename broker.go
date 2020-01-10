@@ -129,7 +129,7 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 		return false
 	}
 
-	segs := gob.Split(filter, TopicDelim)
+	segs := gob.Split(filter, topicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -173,7 +173,7 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
 		return false
 	}
 
-	segs := gob.Split(filter, TopicDelim)
+	segs := gob.Split(filter, topicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -206,7 +206,7 @@ func (b *Broker) Retain(msg *message, topic []byte) {
 		return
 	}
 
-	segs := gob.Split(topic, TopicDelim)
+	segs := gob.Split(topic, topicDelim)
 
 	segsLen := len(segs)
 	if segsLen == 0 {
@@ -220,7 +220,7 @@ func (b *Broker) Retain(msg *message, topic []byte) {
 		b.TopicFilterStorage.addTopLevel(tl)
 	}
 
-	if segsLen == 1 && !gob.Equal(tl.Bytes, TopicSingleLevelWildcard) {
+	if segsLen == 1 && !gob.Equal(tl.Bytes, topicSingleLevelWildcard) {
 		tl.retain(msg)
 		return
 	}
