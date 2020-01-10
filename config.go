@@ -1,24 +1,32 @@
 package gott
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
 
-	"github.com/olebedev/config"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"gopkg.in/yaml.v2"
 )
-
-var defaults = map[string]interface{}{
-	"ConfigPath": "config.yml",
-}
 
 type Config struct {
 	ConfigPath string
+	Listen     string
+	LogLevel   string `yaml:"logLevel"`
 	Plugins    []string
+	logLevel   zapcore.Level
 }
 
-func (c *Config) LoadConfig() {
+func defaultConfig() Config {
+	return Config{
+		Listen:     ":1883",
+		LogLevel:   "error",
+		ConfigPath: "config.yml",
+	}
+}
+
+func (c *Config) loadConfig() error {
 	file, err := ioutil.ReadFile(c.ConfigPath)
 	if err != nil {
 		log.Println("Error opening config file:", err)
@@ -28,31 +36,31 @@ func (c *Config) LoadConfig() {
 		}
 	}
 
-	cfg, err := config.ParseYamlBytes(file)
-	if err != nil {
-		log.Fatalln(fmt.Sprintf("Error parsing config file: %v", err))
+	if err = yaml.Unmarshal(file, c); err != nil {
+		return err
 	}
 
-	if plugins, err := cfg.List("plugins"); err != nil {
-		if strings.Contains(fmt.Sprintf("%s", err), "Type mismatch") ||
-			strings.Contains(fmt.Sprintf("%s", err), "Invalid type") {
-			log.Println("Plugins skipped: plugins property is either empty or of incorrect type. Expecting array/list of plugin names.")
-		} else {
-			log.Println("Couldn't parse plugins property:", err)
-		}
-	} else {
-		for _, plugin := range plugins {
-			if p, ok := plugin.(string); !ok {
-				log.Println("Couldn't parse plugin:", plugin)
-			} else {
-				c.Plugins = append(c.Plugins, p)
-			}
-		}
+	switch c.LogLevel {
+	case "debug":
+		c.logLevel = zap.DebugLevel
+	case "info":
+		c.logLevel = zap.InfoLevel
+	case "error":
+		c.logLevel = zap.ErrorLevel
+	case "fatal":
+		c.logLevel = zap.FatalLevel
+	default:
+		c.LogLevel = "error"
+		c.logLevel = zap.ErrorLevel
 	}
+
+	return nil
 }
 
-func NewConfig() Config {
-	cnf := Config{ConfigPath: defaults["ConfigPath"].(string)}
-	cnf.LoadConfig()
-	return cnf
+func newConfig() (Config, error) {
+	cnf := defaultConfig()
+	if err := cnf.loadConfig(); err != nil {
+		return cnf, err
+	}
+	return cnf, nil
 }

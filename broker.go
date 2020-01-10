@@ -23,7 +23,6 @@ var GOTT *Broker
 
 // Broker is the main broker struct. Should not be used directly. Use the global GOTT var instead.
 type Broker struct {
-	address            string
 	listener           net.Listener
 	clients            map[string]*Client
 	mutex              sync.RWMutex
@@ -36,19 +35,26 @@ type Broker struct {
 }
 
 // NewBroker initializes a new object of type Broker. You can either use the returned pointer or the global GOTT var.
-// It takes an address to bind the connection to.
 // Returns a pointer of type Broker which is also assigned to the global GOTT var and an error.
 // It creates/opens an on-disk session store.
-func NewBroker(address string) (*Broker, error) {
+func NewBroker() (*Broker, error) {
 	GOTT = &Broker{
-		address:            address,
 		listener:           nil,
 		clients:            map[string]*Client{},
-		config:             NewConfig(),
-		logger:             NewLogger(),
+		config:             defaultConfig(),
+		logger:             nil,
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
+
+	c, err := newConfig()
+
+	if err != nil {
+		return nil, err
+	}
+
+	GOTT.config = c
+	GOTT.logger = NewLogger(GOTT.config.logLevel)
 
 	ss, err := loadSessionStore()
 	if err != nil {
@@ -61,16 +67,16 @@ func NewBroker(address string) (*Broker, error) {
 	return GOTT, nil
 }
 
-// Listen starts the broker and listens for new connections on the "address" provided earlier.
+// Listen starts the broker and listens for new connections on the "address" provided in the config file.
 func (b *Broker) Listen() error {
-	l, err := net.Listen("tcp", b.address)
+	l, err := net.Listen("tcp", b.config.Listen)
 	if err != nil {
 		return err
 	}
 	defer l.Close()
 
 	b.listener = l
-	b.logger.Debug("Broker listening on " + b.listener.Addr().String())
+	b.logger.Info("Broker listening on " + b.listener.Addr().String())
 
 	for {
 		conn, err := b.listener.Accept()

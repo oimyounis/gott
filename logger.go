@@ -3,6 +3,8 @@ package gott
 import (
 	"net/url"
 
+	"go.uber.org/zap/zapcore"
+
 	"go.uber.org/zap"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -17,7 +19,7 @@ func (lumberjackSink) Sync() error { return nil }
 
 // NewLogger initializes a new zap.Logger with lumberjack support
 // to write to log files with rotation.
-func NewLogger() *zap.Logger {
+func NewLogger(level zapcore.Level) *zap.Logger {
 	_ = zap.RegisterSink("lumberjack", func(u *url.URL) (zap.Sink, error) {
 		return lumberjackSink{
 			Logger: &lumberjack.Logger{
@@ -32,6 +34,8 @@ func NewLogger() *zap.Logger {
 
 	config := zap.NewDevelopmentConfig()
 	config.OutputPaths = []string{"lumberjack:logs/gott.log"}
+	config.DisableCaller = true
+	config.Level.SetLevel(level)
 
 	logger, _ := config.Build()
 	return logger
