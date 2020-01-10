@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	broker, err := gott.NewBroker(":1883")
+	broker, err := gott.NewBroker()
 	if err != nil {
 		panic(err)
 	}
