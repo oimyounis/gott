@@ -276,6 +276,8 @@ loop:
 			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
 				break loop
 			}
+
+			GOTT.logger.Info("device connected", zap.String("id", c.ClientID), zap.String("username", c.Username), zap.Bool("cleanSession", connFlags.CleanSession))
 		case TypePublish:
 			publishFlags, err := extractPublishFlags(flagsBits)
 			if err != nil {
@@ -356,9 +358,9 @@ loop:
 
 			if GOTT.Publish(topic, payload, publishFlags) {
 				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
-			}
 
-			GOTT.logger.Debug("publish", zap.ByteString("topic", topic), zap.ByteString("payload", payload), zap.Int("qos", int(publishFlags.QoS)))
+				GOTT.logger.Info("publish", zap.ByteString("topic", topic), zap.ByteString("payload", payload), zap.Int("qos", int(publishFlags.QoS)))
+			}
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
@@ -382,6 +384,8 @@ loop:
 
 			GOTT.MessageStore.acknowledge(packetID, StatusPubackReceived, true)
 			c.Session.acknowledge(packetID, StatusPubackReceived, true)
+
+			GOTT.logger.Debug("PUBACK", zap.Uint16("packetID", packetID))
 		case TypePubRec:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
@@ -406,6 +410,8 @@ loop:
 			GOTT.MessageStore.acknowledge(packetID, StatusPubrecReceived, false)
 			c.Session.acknowledge(packetID, StatusPubrecReceived, false)
 			c.emit(makePubRelPacket(packetIDBytes))
+
+			GOTT.logger.Debug("PUBREC", zap.Uint16("packetID", packetID))
 		case TypePubRel:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
 				log.Println("malformed PUBREL packet: flags bits != 0010")
@@ -424,6 +430,8 @@ loop:
 
 			c.Session.MessageStore.acknowledge(packetID, StatusPubrelReceived, true)
 			c.emit(makePubCompPacket(packetIDBytes))
+
+			GOTT.logger.Debug("PUBREL", zap.Uint16("packetID", packetID))
 		case TypePubComp:
 			if remLen != 2 {
 				log.Println("malformed PUBCOMP packet: invalid remaining length")
@@ -446,6 +454,8 @@ loop:
 
 			GOTT.MessageStore.acknowledge(packetID, StatusPubcompReceived, true)
 			c.Session.acknowledge(packetID, StatusPubcompReceived, true)
+
+			GOTT.logger.Debug("PUBCOMP", zap.Uint16("packetID", packetID))
 		case TypeSubscribe:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
@@ -492,6 +502,8 @@ loop:
 
 				if GOTT.Subscribe(c, filter.Filter, filter.QoS) {
 					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
+
+					GOTT.logger.Info("subscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter.Filter), zap.Int("qos", int(filter.QoS)))
 				}
 			}
 
@@ -536,6 +548,8 @@ loop:
 
 				if GOTT.Unsubscribe(c, filter) {
 					GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
+
+					GOTT.logger.Info("unsubscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter))
 				}
 			}
 
