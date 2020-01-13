@@ -42,6 +42,7 @@ $ go get -u github.com/dgraph-io/badger
 $ go get -u github.com/json-iterator/go
 $ go get -u go.uber.org/zap
 $ go get -u gopkg.in/natefinch/lumberjack.v2
+$ go get -u gopkg.in/yaml.v2
 ```
 2. Clone/download this repo.
 3. Run `cd main` inside the project's directory.
