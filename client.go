@@ -49,7 +49,6 @@ loop:
 
 		_, err := sockBuffer.Read(fixedHeader)
 		if err != nil {
-			GOTT.logger.Info("client disconnected", zap.String("id", c.ClientID))
 			//log.Println("fixedHeader read error", err)
 			break
 		}
@@ -599,6 +598,8 @@ func (c *Client) disconnect() {
 
 	if connected {
 		GOTT.invokeOnDisconnect(c.ClientID, c.Username, c.gracefulDisconnect)
+
+		GOTT.logger.Info("client disconnected", zap.String("id", c.ClientID), zap.Bool("graceful", c.gracefulDisconnect))
 	}
 }
 
