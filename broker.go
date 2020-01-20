@@ -61,11 +61,11 @@ func NewBroker() (*Broker, error) {
 	GOTT.config = c
 	GOTT.logger = NewLogger(GOTT.config.logLevel)
 
-	//ss, err := loadSessionStore()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//GOTT.SessionStore = ss
+	ss, err := loadSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	GOTT.SessionStore = ss
 
 	GOTT.bootstrapPlugins()
 
