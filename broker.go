@@ -2,7 +2,10 @@ package gott
 
 import (
 	gob "bytes"
+	"crypto/tls"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net"
@@ -24,6 +27,7 @@ var GOTT *Broker
 // Broker is the main broker struct. Should not be used directly. Use the global GOTT var instead.
 type Broker struct {
 	listener           net.Listener
+	tlsListener        net.Listener
 	clients            map[string]*Client
 	mutex              sync.RWMutex
 	config             Config
@@ -40,6 +44,7 @@ type Broker struct {
 func NewBroker() (*Broker, error) {
 	GOTT = &Broker{
 		listener:           nil,
+		tlsListener:        nil,
 		clients:            map[string]*Client{},
 		config:             defaultConfig(),
 		logger:             nil,
@@ -56,36 +61,80 @@ func NewBroker() (*Broker, error) {
 	GOTT.config = c
 	GOTT.logger = NewLogger(GOTT.config.logLevel)
 
-	ss, err := loadSessionStore()
-	if err != nil {
-		return nil, err
-	}
-	GOTT.SessionStore = ss
+	//ss, err := loadSessionStore()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//GOTT.SessionStore = ss
 
 	GOTT.bootstrapPlugins()
 
 	return GOTT, nil
 }
 
-// Listen starts the broker and listens for new connections on the "address" provided in the config file.
+// Listen starts the broker and listens for new connections on the address provided in the config file.
 func (b *Broker) Listen() error {
-	l, err := net.Listen("tcp", b.config.Listen)
-	if err != nil {
-		return err
-	}
-	defer l.Close()
+	listening := false
 
-	b.listener = l
-	b.logger.Info("Broker listening on " + b.listener.Addr().String())
-
-	for {
-		conn, err := b.listener.Accept()
+	if b.config.Listen != "" {
+		l, err := net.Listen("tcp", b.config.Listen)
 		if err != nil {
-			log.Printf("Couldn't accept connection: %v\n", err)
-		} else {
-			go b.handleConnection(conn)
+			return err
 		}
+		defer l.Close()
+
+		b.listener = l
+		log.Println("Broker listening on " + b.listener.Addr().String())
+		b.logger.Info("Broker listening on " + b.listener.Addr().String())
+
+		go func(b *Broker) {
+			for {
+				conn, err := b.listener.Accept()
+				if err != nil {
+					log.Printf("Couldn't accept connection: %v\n", err)
+				} else {
+					go b.handleConnection(conn)
+				}
+			}
+		}(b)
+		listening = true
 	}
+
+	if b.config.Tls.Enabled() {
+		cert, err := tls.LoadX509KeyPair(b.config.Tls.Cert, b.config.Tls.Key)
+		if err != nil {
+			return fmt.Errorf("couldn't load cert or key file: %v", err)
+		}
+
+		config := tls.Config{Certificates: []tls.Certificate{cert}}
+
+		tl, err := tls.Listen("tcp", b.config.Tls.Listen, &config)
+		if err != nil {
+			return err
+		}
+
+		b.tlsListener = tl
+		log.Println("Started TLS listener on " + b.tlsListener.Addr().String())
+		b.logger.Info("Started TLS listener on " + b.tlsListener.Addr().String())
+
+		go func(b *Broker) {
+			for {
+				conn, err := b.tlsListener.Accept()
+				if err != nil {
+					log.Printf("Couldn't accept connection: %v\n", err)
+				} else {
+					go b.handleConnection(conn)
+				}
+			}
+		}(b)
+		listening = true
+	}
+
+	if !listening {
+		return errors.New("no listeners started. Both non-tls and tls listeners are disabled")
+	}
+
+	select {}
 }
 
 func (b *Broker) addClient(client *Client) {
@@ -114,7 +163,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		return
 	}
 
-	//log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
+	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 
 	c := &Client{
 		connection: conn,

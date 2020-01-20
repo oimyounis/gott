@@ -51,16 +51,29 @@ const (
 	defaultConfigContent = `# GOTT configuration file
 
 # listen property is the address that the broker will listen on,
-# in the format hostname_or_ip:port,
-# default is ":1883".
+# in the format hostname_or_ip:port.
+# In case you wanted to enable connections over TLS only, leave this empty to
+# disable it.
+# Default is ":1883".
 listen: ":1883"
 
-# logLevel property defines the level to which the broker should log messages,
+# tls property defines TLS configurations.
+# To disable leave any of the child properties empty.
+# tls.listen: Defines the address that the broker will use to serve traffic over
+# TLS, in the format hostname_or_ip:port, default is ":8883".
+# tls.cert: Absolute path to the certificate file.
+# tls.key: Absolute path to the key file.
+# Disabled by default.
+tls:
+  listen: ":8883"
+  cert: ""
+  key: ""
+
+# log_level property defines the minimum level to which the broker should log messages,
 # available levels are "debug", "info", "error" and "fatal",
 # "debug" is the lowest and "fatal" is the highest,
-# each level includes higher levels as well,
-# default is "error".
-logLevel: "error"
+# each level includes higher levels as well, default is "error".
+log_level: "error"
 
 # plugins property is a collection of plugin names,
 # all plugins listed here must be placed in the plugins directory to be loaded,
