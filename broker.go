@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	// 4 is MQTT v3.1.1
-	supportedProtocolVersions = []byte{4}
+	supportedProtocolVersions = []byte{mqttv311}
 )
 
 // GOTT is a singleton used to save memory instead of keeping a reference inside each Client

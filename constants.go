@@ -1,5 +1,9 @@
 package gott
 
+const (
+	mqttv311 = 4
+)
+
 // Packet types.
 const (
 	TypeReserved = iota
