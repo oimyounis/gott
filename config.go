@@ -10,10 +10,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type tlsConfig struct {
+	Listen, Cert, Key string
+}
+
+func (t tlsConfig) Enabled() bool {
+	return t.Listen != "" && t.Cert != "" && t.Key != ""
+}
+
 type Config struct {
 	ConfigPath string
 	Listen     string
-	LogLevel   string `yaml:"logLevel"`
+	Tls        tlsConfig
+	LogLevel   string `yaml:"log_level"`
 	Plugins    []string
 	logLevel   zapcore.Level
 }
@@ -21,6 +30,7 @@ type Config struct {
 func defaultConfig() Config {
 	return Config{
 		Listen:     ":1883",
+		Tls:        tlsConfig{Listen: ":8883", Cert: "", Key: ""},
 		LogLevel:   "error",
 		ConfigPath: "config.yml",
 	}
@@ -34,6 +44,7 @@ func (c *Config) loadConfig() error {
 		if err = ioutil.WriteFile("config.yml", []byte(defaultConfigContent), 0664); err != nil {
 			log.Fatalln("Error creating default config.yml file:", err)
 		}
+		file = []byte(defaultConfigContent)
 	}
 
 	if err = yaml.Unmarshal(file, c); err != nil {
