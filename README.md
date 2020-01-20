@@ -25,7 +25,7 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 - [x] Sessions
 - [x] Plugins
 - [x] Logging to disk (with levels and log rotation)
-- [ ] TLS (moved from v2)
+- [x] TLS/SSL
 
 ### Planned for v2
 - [ ] MQTT v5
