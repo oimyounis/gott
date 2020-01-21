@@ -69,6 +69,9 @@ loop:
 
 		packetType, flagsBits := parseFixedHeaderFirstByte(fixedHeader[0])
 		remLen, err := bytes.Decode(remLenEncoded)
+
+		GOTT.stats.bytesIn(1 + int64(len(remLenEncoded)) + int64(remLen))
+
 		if err != nil {
 			log.Println("malformed packet", err)
 			GOTT.logger.Error("malformed", zap.String("reason", "rem len decoding"))
@@ -349,6 +352,8 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
+			GOTT.stats.received(1)
+
 			GOTT.invokeOnMessage(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
 
 			if !GOTT.invokeOnBeforePublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain) {
@@ -500,8 +505,8 @@ loop:
 				}
 
 				if GOTT.Subscribe(c, filter.Filter, filter.QoS) {
+					GOTT.stats.subscription(1)
 					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
-
 					GOTT.logger.Info("subscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter.Filter), zap.Int("qos", int(filter.QoS)))
 				}
 			}
@@ -547,7 +552,6 @@ loop:
 
 				if GOTT.Unsubscribe(c, filter) {
 					GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
-
 					GOTT.logger.Info("unsubscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter))
 				}
 			}
@@ -580,7 +584,7 @@ func (c *Client) disconnect() {
 	c.closeConnection()
 	GOTT.removeClient(c.ClientID)
 
-	log.Printf("client id %s was disconnected", c.ClientID)
+	//log.Printf("client id %s was disconnected", c.ClientID)
 
 	GOTT.UnsubscribeAll(c)
 
@@ -611,5 +615,10 @@ func (c *Client) closeConnection() {
 func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
+		return
 	}
+	if packet[0]>>4 == TypePublish {
+		GOTT.stats.sent(1)
+	}
+	GOTT.stats.bytesOut(int64(len(packet)))
 }

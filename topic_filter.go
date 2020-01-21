@@ -32,6 +32,8 @@ func (tl *topicLevel) deleteSubscription(index int) {
 		newSubs = append(newSubs, tl.Subscriptions[index+1:]...)
 	}
 	tl.Subscriptions = newSubs
+
+	GOTT.stats.subscription(-1)
 }
 
 func (tl *topicLevel) reverse(segs [][]byte, matches *[]*topicLevel) {

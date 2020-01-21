@@ -32,6 +32,7 @@ type Broker struct {
 	config             Config
 	plugins            []gottPlugin
 	logger             *zap.Logger
+	stats              brokerStats
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
@@ -47,6 +48,7 @@ func NewBroker() (*Broker, error) {
 		clients:            map[string]*Client{},
 		config:             defaultConfig(),
 		logger:             nil,
+		stats:              brokerStats{started: time.Now()},
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
@@ -133,6 +135,8 @@ func (b *Broker) Listen() error {
 		return errors.New("no listeners started. Both non-tls and tls listeners are disabled")
 	}
 
+	b.stats.StartMonitor()
+
 	select {}
 }
 
@@ -148,12 +152,14 @@ func (b *Broker) addClient(client *Client) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	b.clients[client.ClientID] = client
+	b.stats.connectedClients(1)
 }
 
 func (b *Broker) removeClient(clientID string) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	delete(b.clients, clientID)
+	b.stats.connectedClients(-1)
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
@@ -162,7 +168,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		return
 	}
 
-	log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
+	//log.Printf("Accepted connection from %v", conn.RemoteAddr().String())
 
 	c := &Client{
 		connection: conn,
