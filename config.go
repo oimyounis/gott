@@ -18,20 +18,36 @@ func (t tlsConfig) Enabled() bool {
 	return t.Listen != "" && t.Cert != "" && t.Key != ""
 }
 
+type loggingConfig struct {
+	LogLevel          string `yaml:"log_level"`
+	Filename          string
+	MaxSize           int  `yaml:"max_size"`
+	MaxBackups        int  `yaml:"max_backups"`
+	MaxAge            int  `yaml:"max_age"`
+	EnableCompression bool `yaml:"enable_compression"`
+	logLevel          zapcore.Level
+}
+
 type Config struct {
 	ConfigPath string
 	Listen     string
 	Tls        tlsConfig
-	LogLevel   string `yaml:"log_level"`
+	Logging    loggingConfig
 	Plugins    []string
-	logLevel   zapcore.Level
 }
 
 func defaultConfig() Config {
 	return Config{
-		Listen:     ":1883",
-		Tls:        tlsConfig{Listen: ":8883", Cert: "", Key: ""},
-		LogLevel:   "error",
+		Listen: ":1883",
+		Tls:    tlsConfig{Listen: ":8883", Cert: "", Key: ""},
+		Logging: loggingConfig{
+			LogLevel:          "error",
+			Filename:          "gott.log",
+			MaxSize:           10,
+			MaxBackups:        20,
+			MaxAge:            30,
+			EnableCompression: true,
+		},
 		ConfigPath: "config.yml",
 	}
 }
@@ -51,18 +67,18 @@ func (c *Config) loadConfig() error {
 		return err
 	}
 
-	switch c.LogLevel {
+	switch c.Logging.LogLevel {
 	case "debug":
-		c.logLevel = zap.DebugLevel
+		c.Logging.logLevel = zap.DebugLevel
 	case "info":
-		c.logLevel = zap.InfoLevel
+		c.Logging.logLevel = zap.InfoLevel
 	case "error":
-		c.logLevel = zap.ErrorLevel
+		c.Logging.logLevel = zap.ErrorLevel
 	case "fatal":
-		c.logLevel = zap.FatalLevel
+		c.Logging.logLevel = zap.FatalLevel
 	default:
-		c.LogLevel = "error"
-		c.logLevel = zap.ErrorLevel
+		c.Logging.LogLevel = "error"
+		c.Logging.logLevel = zap.ErrorLevel
 	}
 
 	return nil

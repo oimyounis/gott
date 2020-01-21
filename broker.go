@@ -58,7 +58,7 @@ func NewBroker() (*Broker, error) {
 	}
 
 	GOTT.config = c
-	GOTT.logger = NewLogger(GOTT.config.logLevel)
+	GOTT.logger = NewLogger(GOTT.config.Logging)
 
 	ss, err := loadSessionStore()
 	if err != nil {

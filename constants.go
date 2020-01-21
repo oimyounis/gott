@@ -52,36 +52,57 @@ const (
 
 const (
 	pluginDir            = "plugins"
-	defaultConfigContent = `# GOTT configuration file
+	defaultConfigContent = `# GOTT Configuration File
 
 # listen property is the address that the broker will listen on,
 # in the format hostname_or_ip:port.
 # In case you wanted to enable connections over TLS only, leave this empty to
 # disable it.
 # Default is ":1883".
+
 listen: ":1883"
+
 
 # tls property defines TLS configurations.
 # To disable leave any of the child properties empty.
-# tls.listen: Defines the address that the broker will use to serve traffic over
-# TLS, in the format hostname_or_ip:port, default is ":8883".
-# tls.cert: Absolute path to the certificate file.
-# tls.key: Absolute path to the key file.
+  # tls.listen: Defines the address that the broker will use to serve traffic over
+    # TLS, in the format hostname_or_ip:port, default is ":8883".
+  # tls.cert: Absolute path to the certificate file.
+  # tls.key: Absolute path to the key file.
 # Disabled by default.
+
 tls:
   listen: ":8883"
   cert: ""
   key: ""
 
-# log_level property defines the minimum level to which the broker should log messages,
-# available levels are "debug", "info", "error" and "fatal",
-# "debug" is the lowest and "fatal" is the highest,
-# each level includes higher levels as well, default is "error".
-log_level: "error"
+
+# logging property adjusts how the logger should behave.
+  # logging.log_level: Defines the minimum level to which the broker should log messages,
+    # available levels are "debug", "info", "error" and "fatal",
+    # "debug" is the lowest and "fatal" is the highest,
+    # each level includes higher levels as well, default is "error".
+  # logging.filename: The name to use for the log file.
+  # logging.max_size: The maximum size in megabytes of the log file to trigger rotation.
+  # logging.max_backups: The maximum number of log files to keep, when the max is reached,
+    # the logger will start deleting older backups.
+  # logging.max_age: The number of days that the logs will live before deleted.
+  # logging.enable_compression: Indicates whether to compress log files when the max_size
+  # is reached or not. (highly recommended to be enabled to save disk space)
+
+logging:
+  log_level: "error"
+  filename: "gott.log"
+  max_size: 10 # megabytes
+  max_backups: 20
+  max_age: 30 # days
+  enable_compression: true
+
 
 # plugins property is a collection of plugin names,
 # all plugins listed here must be placed in the plugins directory to be loaded,
 # plugins are loaded by the order they were listed in.
+
 plugins:
 #  - myplugin.so
 `
