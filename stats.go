@@ -52,6 +52,10 @@ func (s *brokerStats) connectedClients(delta int64) {
 	}
 }
 
+func (s *brokerStats) uptime() time.Duration {
+	return time.Since(s.started).Round(time.Second)
+}
+
 func (s *brokerStats) String() string {
 	return fmt.Sprintf(`Broker Stats:
   Received Messages: %v
@@ -60,7 +64,8 @@ func (s *brokerStats) String() string {
   Bytes In: %v
   Bytes Out: %v
   Connected Clients: %v
-  Uptime: %v`, s.receivedCount, s.sentCount, s.subscriptionCount, s.bytesInCount, s.bytesOutCount, s.connectedClientsCount, time.Since(s.started).Round(time.Second))
+  Uptime: %v`, s.receivedCount, s.sentCount, s.subscriptionCount, s.bytesInCount, s.bytesOutCount, s.connectedClientsCount, s.uptime())
+}
 }
 
 func (s *brokerStats) StartMonitor() {
