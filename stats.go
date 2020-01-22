@@ -2,6 +2,7 @@ package gott
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -15,42 +16,42 @@ type brokerStats struct {
 }
 
 func (s *brokerStats) received(delta int64) {
-	s.receivedCount += delta
+	atomic.AddInt64(&s.receivedCount, delta)
 	if s.receivedCount < 0 {
 		s.receivedCount = 0
 	}
 }
 
 func (s *brokerStats) sent(delta int64) {
-	s.sentCount += delta
+	atomic.AddInt64(&s.sentCount, delta)
 	if s.sentCount < 0 {
 		s.sentCount = 0
 	}
 }
 
 func (s *brokerStats) subscription(delta int64) {
-	s.subscriptionCount += delta
+	atomic.AddInt64(&s.subscriptionCount, delta)
 	if s.subscriptionCount < 0 {
 		s.subscriptionCount = 0
 	}
 }
 
 func (s *brokerStats) bytesIn(delta int64) {
-	s.bytesInCount += delta
+	atomic.AddInt64(&s.bytesInCount, delta)
 	if s.bytesInCount < 0 {
 		s.bytesInCount = 0
 	}
 }
 
 func (s *brokerStats) bytesOut(delta int64) {
-	s.bytesOutCount += delta
+	atomic.AddInt64(&s.bytesOutCount, delta)
 	if s.bytesOutCount < 0 {
 		s.bytesOutCount = 0
 	}
 }
 
 func (s *brokerStats) connectedClients(delta int64) {
-	s.connectedClientsCount += delta
+	atomic.AddInt64(&s.connectedClientsCount, delta)
 	if s.connectedClientsCount < 0 {
 		s.connectedClientsCount = 0
 	}
@@ -68,22 +69,22 @@ func (s *brokerStats) String() string {
   Bytes In: %v
   Bytes Out: %v
   Connected Clients: %v
-  Uptime: %v`, s.receivedCount, s.sentCount, s.subscriptionCount, s.bytesInCount, s.bytesOutCount, s.connectedClientsCount, s.uptime())
+  Uptime: %v`, atomic.LoadInt64(&s.receivedCount), atomic.LoadInt64(&s.sentCount), atomic.LoadInt64(&s.subscriptionCount), atomic.LoadInt64(&s.bytesInCount), atomic.LoadInt64(&s.bytesOutCount), atomic.LoadInt64(&s.connectedClientsCount), s.uptime())
 }
 
 func (s *brokerStats) Json() []byte {
 	stats := map[string]int64{
-		"received":      s.receivedCount,
-		"sent":          s.sentCount,
-		"subscriptions": s.subscriptionCount,
-		"bytesIn":       s.bytesInCount,
-		"bytesOut":      s.bytesOutCount,
-		"clients":       s.connectedClientsCount,
+		"received":      atomic.LoadInt64(&s.receivedCount),
+		"sent":          atomic.LoadInt64(&s.sentCount),
+		"subscriptions": atomic.LoadInt64(&s.subscriptionCount),
+		"bytesIn":       atomic.LoadInt64(&s.bytesInCount),
+		"bytesOut":      atomic.LoadInt64(&s.bytesOutCount),
+		"clients":       atomic.LoadInt64(&s.connectedClientsCount),
 		"uptime":        int64(s.uptime().Seconds()),
 	}
 	b, err := json.Marshal(stats)
 	if err != nil {
-		GOTT.logger.Debug("broker stats JSON marshalling failed", zap.Error(err))
+		GOTT.Logger.Debug("broker stats JSON marshalling failed", zap.Error(err))
 		return []byte{}
 	}
 	return b
