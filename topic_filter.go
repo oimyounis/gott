@@ -33,7 +33,7 @@ func (tl *topicLevel) deleteSubscription(index int) {
 	}
 	tl.Subscriptions = newSubs
 
-	GOTT.stats.subscription(-1)
+	GOTT.Stats.subscription(-1)
 }
 
 func (tl *topicLevel) reverse(segs [][]byte, matches *[]*topicLevel) {
@@ -325,6 +325,26 @@ func (ts *topicStorage) Print() {
 	fmt.Println("Topic Tree:")
 	for _, f := range ts.Filters {
 		f.Print("")
+	}
+}
+
+// String returns the whole Topic Tree in string form.
+func (ts *topicStorage) String() string {
+	var topics []string
+
+	for _, f := range ts.Filters {
+		f.str(&topics)
+	}
+
+	return strings.Join(topics, "\n")
+}
+
+func (tl *topicLevel) str(topics *[]string) {
+	if len(tl.Subscriptions) > 0 {
+		*topics = append(*topics, tl.String())
+	}
+	for _, c := range tl.Children {
+		c.str(topics)
 	}
 }
 
