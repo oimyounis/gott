@@ -61,6 +61,13 @@ func (s *brokerStats) uptime() time.Duration {
 	return time.Since(s.started).Round(time.Second)
 }
 
+func (s *brokerStats) Reset() {
+	s.receivedCount = 0
+	s.sentCount = 0
+	s.bytesInCount = 0
+	s.bytesOutCount = 0
+}
+
 func (s *brokerStats) String() string {
 	return fmt.Sprintf(`Broker Stats:
   Received Messages: %v
