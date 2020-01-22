@@ -31,8 +31,8 @@ type Broker struct {
 	mutex              sync.RWMutex
 	config             Config
 	plugins            []gottPlugin
-	logger             *zap.Logger
-	stats              brokerStats
+	Stats              brokerStats
+	Logger             *zap.Logger
 	TopicFilterStorage *topicStorage
 	MessageStore       *messageStore
 	SessionStore       *sessionStore
@@ -47,8 +47,8 @@ func NewBroker() (*Broker, error) {
 		tlsListener:        nil,
 		clients:            map[string]*Client{},
 		config:             defaultConfig(),
-		logger:             nil,
-		stats:              brokerStats{started: time.Now()},
+		Logger:             nil,
+		Stats:              brokerStats{started: time.Now()},
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
@@ -60,7 +60,7 @@ func NewBroker() (*Broker, error) {
 	}
 
 	GOTT.config = c
-	GOTT.logger = NewLogger(GOTT.config.Logging)
+	GOTT.Logger = NewLogger(GOTT.config.Logging)
 
 	ss, err := loadSessionStore()
 	if err != nil {
@@ -86,7 +86,7 @@ func (b *Broker) Listen() error {
 
 		b.listener = l
 		log.Println("Broker listening on " + b.listener.Addr().String())
-		b.logger.Info("Broker listening on " + b.listener.Addr().String())
+		b.Logger.Info("Broker listening on " + b.listener.Addr().String())
 
 		go func(b *Broker) {
 			for {
@@ -116,7 +116,7 @@ func (b *Broker) Listen() error {
 
 		b.tlsListener = tl
 		log.Println("Started TLS listener on " + b.tlsListener.Addr().String())
-		b.logger.Info("Started TLS listener on " + b.tlsListener.Addr().String())
+		b.Logger.Info("Started TLS listener on " + b.tlsListener.Addr().String())
 
 		go func(b *Broker) {
 			for {
@@ -135,7 +135,7 @@ func (b *Broker) Listen() error {
 		return errors.New("no listeners started. Both non-tls and tls listeners are disabled")
 	}
 
-	b.stats.StartMonitor()
+	b.Stats.StartMonitor()
 
 	select {}
 }
@@ -152,14 +152,14 @@ func (b *Broker) addClient(client *Client) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	b.clients[client.ClientID] = client
-	b.stats.connectedClients(1)
+	b.Stats.connectedClients(1)
 }
 
 func (b *Broker) removeClient(clientID string) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	delete(b.clients, clientID)
-	b.stats.connectedClients(-1)
+	b.Stats.connectedClients(-1)
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {

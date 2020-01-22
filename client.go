@@ -60,7 +60,7 @@ loop:
 			lastByte, err = sockBuffer.ReadByte()
 			if err != nil {
 				//log.Println("read error", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "rem len parsing"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "rem len parsing"),
 					zap.Error(err))
 				break loop
 			}
@@ -70,11 +70,11 @@ loop:
 		packetType, flagsBits := parseFixedHeaderFirstByte(fixedHeader[0])
 		remLen, err := bytes.Decode(remLenEncoded)
 
-		GOTT.stats.bytesIn(1 + int64(len(remLenEncoded)) + int64(remLen))
+		GOTT.Stats.bytesIn(1 + int64(len(remLenEncoded)) + int64(remLen))
 
 		if err != nil {
 			log.Println("malformed packet", err)
-			GOTT.logger.Error("malformed", zap.String("reason", "rem len decoding"))
+			GOTT.Logger.Error("malformed", zap.String("reason", "rem len decoding"))
 			break loop
 		}
 
@@ -85,14 +85,14 @@ loop:
 			payloadLen := remLen - ConnectVarHeaderLen
 			if payloadLen == 0 {
 				log.Println("connect error: payload len is zero")
-				GOTT.logger.Error("malformed", zap.String("reason", "connect error: payload len is zero"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "connect error: payload len is zero"))
 				break loop
 			}
 
 			varHeader := make([]byte, ConnectVarHeaderLen)
 			if _, err = io.ReadFull(sockBuffer, varHeader); err != nil {
 				log.Println("error reading var header", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "connect error: reading var header"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "connect error: reading var header"),
 					zap.Error(err))
 				break loop
 			}
@@ -100,20 +100,20 @@ loop:
 			protocolNameLen := binary.BigEndian.Uint16(varHeader[0:2])
 			if protocolNameLen != 4 {
 				log.Println("malformed packet: protocol name length is incorrect", protocolNameLen)
-				GOTT.logger.Error("malformed", zap.String("reason", "connect error: protocol name length is incorrect"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "connect error: protocol name length is incorrect"))
 				break loop
 			}
 
 			protocolName := string(varHeader[2:6])
 			if protocolName != "MQTT" {
 				log.Println("malformed packet: unknown protocol name. expected MQTT found", protocolName)
-				GOTT.logger.Error("malformed", zap.String("reason", "unknown protocol name. expected MQTT found "+protocolName))
+				GOTT.Logger.Error("malformed", zap.String("reason", "unknown protocol name. expected MQTT found "+protocolName))
 				break loop
 			}
 
 			if !utils.ByteInSlice(varHeader[6], supportedProtocolVersions) {
 				log.Println("unsupported protocol", varHeader[6])
-				GOTT.logger.Error("malformed", zap.String("reason", "unsupported protocol "+strconv.Itoa(int(varHeader[6]))))
+				GOTT.Logger.Error("malformed", zap.String("reason", "unsupported protocol "+strconv.Itoa(int(varHeader[6]))))
 				c.emit(makeConnAckPacket(0, ConnectUnacceptableProto))
 				break loop
 			}
@@ -121,7 +121,7 @@ loop:
 			connFlags, err := extractConnectFlags(varHeader[7])
 			if err != nil {
 				log.Println("malformed packet: ", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "connect flags extraction"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "connect flags extraction"),
 					zap.Error(err))
 				break loop
 			}
@@ -132,7 +132,7 @@ loop:
 			payload := make([]byte, payloadLen)
 			if _, err = io.ReadFull(sockBuffer, payload); err != nil {
 				log.Println("error reading payload", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading payload"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading payload"), zap.Error(err))
 				break loop
 			}
 
@@ -144,7 +144,7 @@ loop:
 			if clientIDLen == 0 {
 				if !connFlags.CleanSession {
 					log.Println("connect error: received zero byte client id with clean session flag set to 0")
-					GOTT.logger.Error("malformed", zap.String("reason", "connect error: received zero byte client id with clean session flag set to 0"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "connect error: received zero byte client id with clean session flag set to 0"))
 					c.emit(makeConnAckPacket(0, ConnectIDRejected))
 					break loop
 				}
@@ -152,7 +152,7 @@ loop:
 			} else {
 				if payloadLen < 2+clientIDLen {
 					log.Println("malformed packet: payload length is not valid")
-					GOTT.logger.Error("malformed", zap.String("reason", "payload length is not valid (clientID)"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "payload length is not valid (clientID)"))
 					break loop
 				}
 				c.ClientID = string(payload[head : head+clientIDLen])
@@ -193,7 +193,7 @@ loop:
 			if connFlags.UserNameFlag {
 				if payloadLen < head+2 {
 					log.Println("malformed packet: payload length is not valid")
-					GOTT.logger.Error("malformed", zap.String("reason", "payload length is not valid (UserNameFlag)"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "payload length is not valid (UserNameFlag)"))
 					break loop
 				}
 				usernameLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
@@ -203,7 +203,7 @@ loop:
 				}
 				if payloadLen < head+usernameLen {
 					log.Println("malformed packet: payload length is not valid")
-					GOTT.logger.Error("malformed", zap.String("reason", "payload length is not valid (usernameLen)"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "payload length is not valid (usernameLen)"))
 					break loop
 				}
 				username := payload[head : head+usernameLen]
@@ -217,7 +217,7 @@ loop:
 			if connFlags.PasswordFlag {
 				if payloadLen < head+2 {
 					log.Println("malformed packet: payload length is not valid")
-					GOTT.logger.Error("malformed", zap.String("reason", "payload length is not valid (PasswordFlag)"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "payload length is not valid (PasswordFlag)"))
 					break loop
 				}
 				passwordLen := int(binary.BigEndian.Uint16(payload[head : head+2]))
@@ -227,7 +227,7 @@ loop:
 				}
 				if payloadLen < head+passwordLen {
 					log.Println("malformed packet: payload length is not valid")
-					GOTT.logger.Error("malformed", zap.String("reason", "payload length is not valid (passwordLen)"))
+					GOTT.Logger.Error("malformed", zap.String("reason", "payload length is not valid (passwordLen)"))
 					break loop
 				}
 				password := payload[head : head+passwordLen]
@@ -260,7 +260,7 @@ loop:
 			} else {
 				if err := c.Session.put(); err != nil {
 					log.Println("error putting session to store:", err)
-					GOTT.logger.Error("malformed", zap.String("reason", "error putting session to store"),
+					GOTT.Logger.Error("malformed", zap.String("reason", "error putting session to store"),
 						zap.Error(err))
 					break loop
 				}
@@ -279,19 +279,19 @@ loop:
 				break loop
 			}
 
-			GOTT.logger.Info("device connected", zap.String("id", c.ClientID), zap.String("username", c.Username), zap.Bool("cleanSession", connFlags.CleanSession))
+			GOTT.Logger.Info("device connected", zap.String("id", c.ClientID), zap.String("username", c.Username), zap.Bool("cleanSession", connFlags.CleanSession))
 		case TypePublish:
 			publishFlags, err := extractPublishFlags(flagsBits)
 			if err != nil {
 				log.Println("error reading publish packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading publish packet"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading publish packet"))
 				break loop
 			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading publish packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading publish packet"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading publish packet"),
 					zap.Error(err))
 				break loop
 			}
@@ -299,13 +299,13 @@ loop:
 			topicLen := int(binary.BigEndian.Uint16(remBytes[:2]))
 			if topicLen == 0 {
 				log.Println("received empty topic. disconnecting client.")
-				GOTT.logger.Error("malformed", zap.String("reason", "received empty topic"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "received empty topic"))
 				break loop
 			}
 
 			if len(remBytes) < 2+topicLen {
 				log.Println("malformed packet: topic length is not valid")
-				GOTT.logger.Error("malformed", zap.String("reason", "topic length is not valid"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "topic length is not valid"))
 				break loop
 			}
 
@@ -314,7 +314,7 @@ loop:
 
 			if !validTopicName(topic) {
 				log.Println("malformed packet: invalid topic name")
-				GOTT.logger.Error("malformed", zap.String("reason", "invalid topic name"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "invalid topic name"))
 				break loop
 			}
 
@@ -352,7 +352,7 @@ loop:
 				c.emit(makePubRecPacket(packetIDBytes))
 			}
 
-			GOTT.stats.received(1)
+			GOTT.Stats.received(1)
 
 			GOTT.invokeOnMessage(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, publishFlags.Retain)
 
@@ -363,19 +363,19 @@ loop:
 			if GOTT.Publish(topic, payload, publishFlags) {
 				GOTT.invokeOnPublish(c.ClientID, c.Username, topic, payload, publishFlags.DUP, publishFlags.QoS, false)
 
-				GOTT.logger.Info("publish", zap.ByteString("topic", topic), zap.ByteString("payload", payload), zap.Int("qos", int(publishFlags.QoS)))
+				GOTT.Logger.Info("publish", zap.ByteString("topic", topic), zap.ByteString("payload", payload), zap.Int("qos", int(publishFlags.QoS)))
 			}
 		case TypePubAck:
 			if remLen != 2 {
 				log.Println("malformed PUBACK packet: invalid remaining length")
-				GOTT.logger.Error("malformed", zap.String("reason", "PUBACK packet: invalid remaining length"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "PUBACK packet: invalid remaining length"))
 				break loop
 			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading PUBACK packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBACK packet"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading PUBACK packet"),
 					zap.Error(err))
 				break loop
 			}
@@ -389,18 +389,18 @@ loop:
 			GOTT.MessageStore.acknowledge(packetID, StatusPubackReceived, true)
 			c.Session.acknowledge(packetID, StatusPubackReceived, true)
 
-			GOTT.logger.Debug("PUBACK", zap.Uint16("packetID", packetID))
+			GOTT.Logger.Debug("PUBACK", zap.Uint16("packetID", packetID))
 		case TypePubRec:
 			if remLen != 2 {
 				log.Println("malformed PUBREC packet: invalid remaining length")
-				GOTT.logger.Error("malformed", zap.String("reason", "PUBREC packet: invalid remaining length"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "PUBREC packet: invalid remaining length"))
 				break loop
 			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading PUBREC packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBREC packet"),
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading PUBREC packet"),
 					zap.Error(err))
 				break loop
 			}
@@ -415,18 +415,18 @@ loop:
 			c.Session.acknowledge(packetID, StatusPubrecReceived, false)
 			c.emit(makePubRelPacket(packetIDBytes))
 
-			GOTT.logger.Debug("PUBREC", zap.Uint16("packetID", packetID))
+			GOTT.Logger.Debug("PUBREC", zap.Uint16("packetID", packetID))
 		case TypePubRel:
 			if flagsBits != "0010" { // as per [MQTT-3.6.1-1]
 				log.Println("malformed PUBREL packet: flags bits != 0010")
-				GOTT.logger.Error("malformed", zap.String("reason", "PUBREL packet: flags bits != 0010"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "PUBREL packet: flags bits != 0010"))
 				break loop
 			}
 
 			packetIDBytes := make([]byte, PubrelRemLen)
 			if _, err = io.ReadFull(sockBuffer, packetIDBytes); err != nil {
 				log.Println("error reading var header", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "PUBREL packet: reading var header"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "PUBREL packet: reading var header"), zap.Error(err))
 				break loop
 			}
 
@@ -435,18 +435,18 @@ loop:
 			c.Session.MessageStore.acknowledge(packetID, StatusPubrelReceived, true)
 			c.emit(makePubCompPacket(packetIDBytes))
 
-			GOTT.logger.Debug("PUBREL", zap.Uint16("packetID", packetID))
+			GOTT.Logger.Debug("PUBREL", zap.Uint16("packetID", packetID))
 		case TypePubComp:
 			if remLen != 2 {
 				log.Println("malformed PUBCOMP packet: invalid remaining length")
-				GOTT.logger.Error("malformed", zap.String("reason", "PUBCOMP packet: invalid remaining length"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "PUBCOMP packet: invalid remaining length"))
 				break loop
 			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading PUBCOMP packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBCOMP packet"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading PUBCOMP packet"), zap.Error(err))
 				break loop
 			}
 
@@ -459,24 +459,24 @@ loop:
 			GOTT.MessageStore.acknowledge(packetID, StatusPubcompReceived, true)
 			c.Session.acknowledge(packetID, StatusPubcompReceived, true)
 
-			GOTT.logger.Debug("PUBCOMP", zap.Uint16("packetID", packetID))
+			GOTT.Logger.Debug("PUBCOMP", zap.Uint16("packetID", packetID))
 		case TypeSubscribe:
 			if flagsBits != "0010" { // as per [MQTT-3.8.1-1]
 				log.Println("malformed SUBSCRIBE packet: flags bits != 0010")
-				GOTT.logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: flags bits != 0010"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: flags bits != 0010"))
 				break loop
 			}
 
 			if remLen < 3 {
 				log.Println("malformed SUBSCRIBE packet: remLen < 3")
-				GOTT.logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: remLen < 3"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: remLen < 3"))
 				break loop
 			}
 
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading SUBSCRIBE packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading SUBSCRIBE packet"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading SUBSCRIBE packet"), zap.Error(err))
 				break loop
 			}
 
@@ -486,14 +486,14 @@ loop:
 
 			if len(payload) < 3 { // 3 is used to make sure there are at least 2 bytes for topic length and 1 byte for topic name of at least 1 character (eg. 00 01 97)
 				log.Println("malformed SUBSCRIBE packet: remLen < 3")
-				GOTT.logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: remLen < 3"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet: remLen < 3"))
 				break loop
 			}
 
 			filterList, err := extractSubTopicFilters(payload)
 			if err != nil {
 				log.Println("malformed SUBSCRIBE packet:", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "SUBSCRIBE packet"), zap.Error(err))
 				break loop
 			}
 
@@ -505,9 +505,9 @@ loop:
 				}
 
 				if GOTT.Subscribe(c, filter.Filter, filter.QoS) {
-					GOTT.stats.subscription(1)
+					GOTT.Stats.subscription(1)
 					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
-					GOTT.logger.Info("subscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter.Filter), zap.Int("qos", int(filter.QoS)))
+					GOTT.Logger.Info("subscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter.Filter), zap.Int("qos", int(filter.QoS)))
 				}
 			}
 
@@ -515,7 +515,7 @@ loop:
 		case TypeUnsubscribe:
 			if flagsBits != "0010" { // as per [MQTT-3.10.1-1]
 				log.Println("malformed UNSUBSCRIBE packet: flags bits != 0010")
-				GOTT.logger.Error("malformed", zap.String("reason", "UNSUBSCRIBE packet: flags bits != 0010"))
+				GOTT.Logger.Error("malformed", zap.String("reason", "UNSUBSCRIBE packet: flags bits != 0010"))
 				break loop
 			}
 
@@ -526,7 +526,7 @@ loop:
 			remBytes := make([]byte, remLen)
 			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
 				log.Println("error reading UNSUBSCRIBE packet", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "reading UNSUBSCRIBE packet"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "reading UNSUBSCRIBE packet"), zap.Error(err))
 				break loop
 			}
 
@@ -541,7 +541,7 @@ loop:
 			filterList, err := extractUnSubTopicFilters(payload)
 			if err != nil {
 				log.Println("malformed UNSUBSCRIBE packet:", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "UNSUBSCRIBE packet"), zap.Error(err))
+				GOTT.Logger.Error("malformed", zap.String("reason", "UNSUBSCRIBE packet"), zap.Error(err))
 				break loop
 			}
 
@@ -552,7 +552,7 @@ loop:
 
 				if GOTT.Unsubscribe(c, filter) {
 					GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
-					GOTT.logger.Info("unsubscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter))
+					GOTT.Logger.Info("unsubscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter))
 				}
 			}
 
@@ -565,7 +565,7 @@ loop:
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE")
-			GOTT.logger.Error("malformed", zap.String("reason", "UNKNOWN PACKET TYPE"))
+			GOTT.Logger.Error("malformed", zap.String("reason", "UNKNOWN PACKET TYPE"))
 			break loop
 		}
 
@@ -603,7 +603,7 @@ func (c *Client) disconnect() {
 	if connected {
 		GOTT.invokeOnDisconnect(c.ClientID, c.Username, c.gracefulDisconnect)
 
-		GOTT.logger.Info("client disconnected", zap.String("id", c.ClientID), zap.Bool("graceful", c.gracefulDisconnect))
+		GOTT.Logger.Info("client disconnected", zap.String("id", c.ClientID), zap.Bool("graceful", c.gracefulDisconnect))
 	}
 }
 
@@ -614,11 +614,11 @@ func (c *Client) closeConnection() {
 
 func (c *Client) emit(packet []byte) {
 	if _, err := c.connection.Write(packet); err != nil {
-		log.Println("error sending packet", err, packet)
+		GOTT.Logger.Error("error sending packet", zap.Error(err))
 		return
 	}
 	if packet[0]>>4 == TypePublish {
-		GOTT.stats.sent(1)
+		GOTT.Stats.sent(1)
 	}
-	GOTT.stats.bytesOut(int64(len(packet)))
+	GOTT.Stats.bytesOut(int64(len(packet)))
 }
