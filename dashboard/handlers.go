@@ -20,9 +20,15 @@ func handle(b *gott.Broker) {
 		return c.JSONBlob(http.StatusOK, b.Stats.Json())
 	})
 
+	HTTP.POST("api/stats/reset", func(c echo.Context) error {
+		b.Stats.Reset()
+		return c.String(http.StatusOK, "")
+	})
+
 	HTTP.GET("/stats", func(c echo.Context) error {
 		return c.HTML(http.StatusOK, `
 <body>
+<button id="resetBtn">Reset</button>
 <h4>Server Stats:</h4>
 <pre id="stats"></pre>
 
@@ -34,6 +40,10 @@ func handle(b *gott.Broker) {
 <script>
 var stats = document.querySelector("#stats");
 var topics = document.querySelector("#topics");
+
+document.querySelector("#resetBtn").onclick = function(){
+fetch("/api/stats/reset", {method:"POST"});
+};
 
 function formatTime(seconds) {
 var time = new Date(1000 * seconds).toISOString().substr(11, 8);
