@@ -3,6 +3,10 @@ package gott
 import (
 	"fmt"
 	"time"
+
+	"go.uber.org/zap"
+
+	json "github.com/json-iterator/go"
 )
 
 type brokerStats struct {
@@ -66,6 +70,23 @@ func (s *brokerStats) String() string {
   Connected Clients: %v
   Uptime: %v`, s.receivedCount, s.sentCount, s.subscriptionCount, s.bytesInCount, s.bytesOutCount, s.connectedClientsCount, s.uptime())
 }
+
+func (s *brokerStats) Json() []byte {
+	stats := map[string]int64{
+		"received":      s.receivedCount,
+		"sent":          s.sentCount,
+		"subscriptions": s.subscriptionCount,
+		"bytesIn":       s.bytesInCount,
+		"bytesOut":      s.bytesOutCount,
+		"clients":       s.connectedClientsCount,
+		"uptime":        int64(s.uptime().Seconds()),
+	}
+	b, err := json.Marshal(stats)
+	if err != nil {
+		GOTT.logger.Debug("broker stats JSON marshalling failed", zap.Error(err))
+		return []byte{}
+	}
+	return b
 }
 
 func (s *brokerStats) StartMonitor() {
