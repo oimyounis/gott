@@ -37,12 +37,12 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 ## Quick Start
 1. Install dependencies:  
 ```shell script
-$ go get -u github.com/google/uuid
-$ go get -u github.com/dgraph-io/badger
-$ go get -u github.com/json-iterator/go
-$ go get -u go.uber.org/zap
-$ go get -u gopkg.in/natefinch/lumberjack.v2
-$ go get -u gopkg.in/yaml.v2
+go get -u github.com/google/uuid
+go get -u github.com/dgraph-io/badger
+go get -u github.com/json-iterator/go
+go get -u go.uber.org/zap
+go get -u gopkg.in/natefinch/lumberjack.v2
+go get -u gopkg.in/yaml.v2
 ```
 2. Clone/download this repo.
 3. Run `cd main` inside the project's directory.

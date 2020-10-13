@@ -3,8 +3,9 @@ package gott
 import (
 	gob "bytes"
 	"fmt"
-	"gott/utils"
 	"strings"
+
+	"github.com/oimyounis/gott/utils"
 )
 
 var (

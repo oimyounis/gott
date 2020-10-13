@@ -3,13 +3,14 @@ package gott
 import (
 	"bufio"
 	"encoding/binary"
-	"gott/bytes"
-	"gott/utils"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/oimyounis/gott/bytes"
+	"github.com/oimyounis/gott/utils"
 
 	"go.uber.org/zap"
 

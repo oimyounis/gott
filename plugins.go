@@ -8,9 +8,12 @@ import (
 	"path"
 	"plugin"
 
+	"github.com/oimyounis/gott/utils"
+
 	"go.uber.org/zap"
 )
 
+// gottPlugin represents an plugin
 type gottPlugin struct {
 	name                string
 	plug                *plugin.Plugin
