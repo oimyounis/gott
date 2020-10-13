@@ -1,7 +1,6 @@
 package gott
 
 import (
-	"gott/utils"
 	"log"
 	"net"
 	"os"
