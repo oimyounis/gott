@@ -45,7 +45,7 @@ $ go get gopkg.in/natefinch/lumberjack.v2
 $ go get gopkg.in/yaml.v2
 $ go get github.com/gorilla/websocket
 ```
-2. Clone/download this repo.
+2. Clone/download this repo and place it in $GOPATH/src.
 3. Run `cd main` inside the project's directory.
 4. Run `go run main.go`.
 
