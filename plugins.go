@@ -1,12 +1,13 @@
 package gott
 
 import (
-	"gott/utils"
 	"log"
 	"net"
 	"os"
 	"path"
 	"plugin"
+
+	"github.com/oimyounis/gott/utils"
 
 	"go.uber.org/zap"
 )

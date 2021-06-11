@@ -2,7 +2,8 @@ package gott
 
 import (
 	"encoding/binary"
-	"gott/bytes"
+
+	"github.com/oimyounis/gott/bytes"
 )
 
 var packetSeq = &sequencer{UpperBoundBits: 16, Start: 1}

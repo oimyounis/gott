@@ -1,9 +1,10 @@
 package gott
 
 import (
-	"gott/utils"
 	"log"
 	"net/http"
+
+	"github.com/oimyounis/gott/utils"
 
 	"github.com/gorilla/websocket"
 )
