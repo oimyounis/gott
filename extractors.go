@@ -3,8 +3,7 @@ package gott
 import (
 	"encoding/binary"
 	"errors"
-
-	"github.com/oimyounis/gott/bytes"
+	"gott/bytes"
 )
 
 var noopConnectFlags = connectFlags{}

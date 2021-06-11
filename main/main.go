@@ -1,9 +1,8 @@
 package main
 
 import (
+	"gott"
 	"log"
-
-	"github.com/oimyounis/gott"
 )
 
 func main() {

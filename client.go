@@ -4,15 +4,14 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"gott/bytes"
+	"gott/utils"
 	"io"
 	"log"
 	"net"
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/oimyounis/gott/bytes"
-	"github.com/oimyounis/gott/utils"
 
 	"github.com/gorilla/websocket"
 
