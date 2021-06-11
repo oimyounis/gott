@@ -11,6 +11,7 @@ import (
 	"net"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -27,6 +28,7 @@ var GOTT *Broker
 type Broker struct {
 	listener           net.Listener
 	tlsListener        net.Listener
+	wsServer           *webSocketsServer
 	clients            map[string]*Client
 	mutex              sync.RWMutex
 	config             Config
@@ -42,11 +44,8 @@ type Broker struct {
 // It creates/opens an on-disk session store.
 func NewBroker() (*Broker, error) {
 	GOTT = &Broker{
-		listener:           nil,
-		tlsListener:        nil,
 		clients:            map[string]*Client{},
 		config:             defaultConfig(),
-		logger:             nil,
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
 	}
@@ -67,6 +66,10 @@ func NewBroker() (*Broker, error) {
 	GOTT.SessionStore = ss
 
 	GOTT.bootstrapPlugins()
+
+	if c.WebSockets.WSS.Enabled() || c.WebSockets.Listen != "" {
+		GOTT.wsServer = newWebSocketsServer(c)
+	}
 
 	return GOTT, nil
 }
@@ -111,6 +114,7 @@ func (b *Broker) Listen() error {
 		if err != nil {
 			return err
 		}
+		defer tl.Close()
 
 		b.tlsListener = tl
 		log.Println("Started TLS listener on " + b.tlsListener.Addr().String())
@@ -129,8 +133,22 @@ func (b *Broker) Listen() error {
 		listening = true
 	}
 
+	if b.wsServer != nil {
+		if b.config.WebSockets.Listen != "" {
+			go b.wsServer.Listen()
+			log.Println("Started WebSockets server on " + b.config.WebSockets.Listen)
+			b.logger.Info("Started WebSockets server on " + b.config.WebSockets.Listen)
+		}
+		if b.config.WebSockets.WSS.Enabled() {
+			go b.wsServer.ListenTLS()
+			log.Println("Started Secure WebSockets server on " + b.config.WebSockets.WSS.Listen)
+			b.logger.Info("Started Secure WebSockets server on " + b.config.WebSockets.WSS.Listen)
+		}
+		listening = true
+	}
+
 	if !listening {
-		return errors.New("no listeners started. Both non-tls and tls listeners are disabled")
+		return errors.New("no listeners started. Non-TLS, TLS and WebSockets listeners are disabled")
 	}
 
 	select {}
@@ -166,7 +184,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	c := &Client{
 		connection: conn,
-		connected:  true,
+		connected:  atomicBool{val: true},
 	}
 	go c.listen()
 }
@@ -187,7 +205,7 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 	topLevel := segs[0]
 	tl := b.TopicFilterStorage.find(topLevel)
 	if tl == nil {
-		tl = &topicLevel{Bytes: topLevel}
+		tl = &topicLevel{Bytes: topLevel, Subscriptions: &subscriptionList{}}
 		b.TopicFilterStorage.addTopLevel(tl)
 	}
 
@@ -242,8 +260,10 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
 // UnsubscribeAll is used to remove all subscriptions of a client.
 // Currently used when the Client disconnects.
 func (b *Broker) UnsubscribeAll(client *Client) {
+	b.TopicFilterStorage.mutex.Lock()
+	defer b.TopicFilterStorage.mutex.Unlock()
 	for _, tl := range b.TopicFilterStorage.Filters {
-		tl.DeleteSubscription(client, false)
+		tl.DeleteSubscription(client, client.gracefulDisconnect)
 		tl.traverseDeleteAll(client)
 	}
 }
@@ -264,7 +284,7 @@ func (b *Broker) Retain(msg *message, topic []byte) {
 	topLevel := segs[0]
 	tl := b.TopicFilterStorage.find(topLevel)
 	if tl == nil {
-		tl = &topicLevel{Bytes: topLevel}
+		tl = &topicLevel{Bytes: topLevel, Subscriptions: &subscriptionList{}}
 		b.TopicFilterStorage.addTopLevel(tl)
 	}
 
@@ -300,7 +320,7 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 	}
 
 	for _, match := range matches {
-		for _, sub := range match.Subscriptions {
+		match.Subscriptions.Range(func(i int, sub *subscription) bool {
 			qos := byte(math.Min(float64(sub.QoS), float64(flags.QoS)))
 			// dup is zero according to [MQTT-3.3.1.-1] and [MQTT-3.3.1-3]
 			packet, packetID := makePublishPacket(topic, payload, 0, qos, 0)
@@ -318,7 +338,7 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 				}
 			}
 
-			if sub.Session.client != nil && sub.Session.client.connected {
+			if sub.Session.client != nil && sub.Session.client.connected.Load() {
 				sub.Session.client.emit(packet)
 				if qos != 0 {
 					b.MessageStore.store(packetID, msg)
@@ -329,7 +349,8 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 					sub.Session.storeMessage(packetID, msg)
 				}
 			}
-		}
+			return true
+		})
 	}
 
 	return true
@@ -341,7 +362,7 @@ func (b *Broker) PublishRetained(msg *message, sub *subscription) {
 		return
 	}
 
-	if sub.Session.client != nil && sub.Session.client.connected {
+	if sub.Session.client != nil && sub.Session.client.connected.Load() {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
 		packet, packetID := makePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
 		if qosOut != 0 {
@@ -363,7 +384,7 @@ func (b *Broker) PublishRetained(msg *message, sub *subscription) {
 
 // PublishToClient is used to publish a message with a provided packetId to a specific client.
 func (b *Broker) PublishToClient(client *Client, packetID uint16, cm *clientMessage) {
-	if client.connected {
+	if client.connected.Load() {
 		packet := makePublishPacketWithID(packetID, cm.Topic, cm.Payload, 0, cm.QoS, 0)
 		if cm.QoS != 0 {
 			cm.client = client
@@ -384,8 +405,8 @@ func Retry(packetID uint16, msg *clientMessage) {
 	defer Recover(nil)
 	for {
 		time.Sleep(time.Second * 5)
-		if msg != nil && msg.client != nil && msg.client.connected {
-			switch msg.Status {
+		if msg != nil && msg.client != nil && msg.client.connected.Load() {
+			switch atomic.LoadInt32(&msg.Status) {
 			case StatusPubackReceived, StatusPubcompReceived:
 				return
 			}
@@ -395,7 +416,7 @@ func Retry(packetID uint16, msg *clientMessage) {
 
 		time.Sleep(time.Second * 15)
 
-		if msg.client.connected {
+		if msg.client.connected.Load() {
 			switch msg.Status {
 			case StatusUnacknowledged:
 				msg.client.emit(makePublishPacketWithID(packetID, msg.Topic, msg.Payload, 1, msg.QoS, msg.Retain))

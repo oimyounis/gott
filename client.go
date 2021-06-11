@@ -3,31 +3,107 @@ package gott
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"gott/bytes"
 	"gott/utils"
 	"io"
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/gorilla/websocket"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
+
+var errReceivedTextMessage = errors.New("received text msg, breaking connection")
 
 // Client is the main struct for every client that connects to GOTT.
 // Holds all the info needed to process its messages and maintain state.
 type Client struct {
 	connection           net.Conn
-	connected            bool
+	wsConnection         *websocket.Conn
+	connected            atomicBool
 	keepAliveSecs        int
 	lastPacketReceivedOn time.Time
 	gracefulDisconnect   bool
+	reader               *bufio.Reader
+	wsReader             io.Reader
+	wsMutex              sync.Mutex
 	ClientID             string
 	WillMessage          *message
 	Username, Password   string
 	Session              *session
+}
+
+// isWebSocket returns a bool indicating whether this Client is using Web Sockets.
+func (c *Client) isWebSocket() bool {
+	return c.wsConnection != nil
+}
+
+// read will read len(p) bytes from the Client's socket.
+// Web Sockets have a different implementation because it shouldn't assume that the frames are aligned.
+func (c *Client) read(p []byte) (int, error) {
+	if c.isWebSocket() {
+		var n int
+		var err error
+		idx := 0
+		for idx < len(p) {
+			n, err = c.wsReader.Read(p[idx:])
+			if err != nil || n == 0 {
+				if err == io.EOF {
+					err = c.wsNextReader()
+					if err != nil {
+						break
+					}
+					continue
+				}
+				break
+			}
+			idx += n
+		}
+		return n, err
+	}
+	return c.reader.Read(p)
+}
+
+func (c *Client) readByte() (byte, error) {
+	if c.isWebSocket() {
+		b := make([]byte, 1)
+		n, err := c.read(b)
+		if n == 0 {
+			return 0, io.EOF
+		}
+		return b[0], err
+	}
+	return c.reader.ReadByte()
+}
+
+func (c *Client) readFull(p []byte) (int, error) {
+	if c.isWebSocket() {
+		return c.read(p)
+	}
+	return io.ReadFull(c.reader, p)
+}
+
+func (c *Client) wsNextReader() error {
+	msgType, r, err := c.wsConnection.NextReader()
+	if err != nil {
+		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			log.Printf("ws read error: %v", err)
+		}
+		return err
+	}
+
+	if msgType == websocket.TextMessage {
+		log.Println("received text msg, breaking connection")
+		return errReceivedTextMessage
+	}
+	c.wsReader = r
+	return nil
 }
 
 func (c *Client) listen() {
@@ -37,19 +113,28 @@ func (c *Client) listen() {
 		}
 	}(c))
 
-	sockBuffer := bufio.NewReader(c.connection)
+	if !c.isWebSocket() {
+		c.reader = bufio.NewReader(c.connection)
+	}
 
 loop:
 	for {
-		if !c.connected {
+		if !c.connected.Load() {
 			break
+		}
+
+		if c.isWebSocket() {
+			err := c.wsNextReader()
+			if err != nil {
+				break
+			}
 		}
 
 		fixedHeader := make([]byte, 2)
 
-		_, err := sockBuffer.Read(fixedHeader)
+		_, err := c.read(fixedHeader)
 		if err != nil {
-			//log.Println("fixedHeader read error", err)
+			log.Println("fixedHeader read error", err)
 			break
 		}
 
@@ -57,11 +142,10 @@ loop:
 		remLenEncoded := []byte{lastByte}
 
 		for lastByte >= 128 {
-			lastByte, err = sockBuffer.ReadByte()
+			lastByte, err = c.readByte()
 			if err != nil {
 				//log.Println("read error", err)
-				GOTT.logger.Error("malformed", zap.String("reason", "rem len parsing"),
-					zap.Error(err))
+				GOTT.logger.Error("malformed", zap.String("reason", "rem len parsing"), zap.Error(err))
 				break loop
 			}
 			remLenEncoded = append(remLenEncoded, lastByte)
@@ -77,17 +161,25 @@ loop:
 
 		c.lastPacketReceivedOn = time.Now()
 
+		if c.ClientID == "" {
+			switch packetType {
+			case TypePublish, TypePubAck, TypePubRec, TypePubRel, TypePubComp, TypeSubscribe, TypeUnsubscribe, TypePingReq, TypeDisconnect:
+				log.Println("received packet type:", packetType, "from a client with an empty Client ID")
+				break loop
+			}
+		}
+
 		switch packetType {
 		case TypeConnect:
 			payloadLen := remLen - ConnectVarHeaderLen
-			if payloadLen == 0 {
-				log.Println("connect error: payload len is zero")
-				GOTT.logger.Error("malformed", zap.String("reason", "connect error: payload len is zero"))
+			if payloadLen <= 0 {
+				log.Println("connect error: payload len is <= zero")
+				GOTT.logger.Error("malformed", zap.String("reason", "connect error: payload len is <= zero"))
 				break loop
 			}
 
 			varHeader := make([]byte, ConnectVarHeaderLen)
-			if _, err = io.ReadFull(sockBuffer, varHeader); err != nil {
+			if _, err = c.readFull(varHeader); err != nil {
 				log.Println("error reading var header", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "connect error: reading var header"),
 					zap.Error(err))
@@ -127,7 +219,7 @@ loop:
 
 			// payload parsing
 			payload := make([]byte, payloadLen)
-			if _, err = io.ReadFull(sockBuffer, payload); err != nil {
+			if _, err = c.readFull(payload); err != nil {
 				log.Println("error reading payload", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading payload"), zap.Error(err))
 				break loop
@@ -266,11 +358,11 @@ loop:
 			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
-			//log.Println("client connected with id:", c.ClientID)
+			log.Println("client connected with id:", c.ClientID)
 			GOTT.addClient(c)
 			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
-			c.Session.replay()
+			c.Session.replay() //
 
 			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
 				break loop
@@ -286,7 +378,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading publish packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading publish packet"),
 					zap.Error(err))
@@ -368,7 +460,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading PUBACK packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBACK packet"),
 					zap.Error(err))
@@ -393,7 +485,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading PUBREC packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBREC packet"),
 					zap.Error(err))
@@ -419,7 +511,7 @@ loop:
 			}
 
 			packetIDBytes := make([]byte, PubrelRemLen)
-			if _, err = io.ReadFull(sockBuffer, packetIDBytes); err != nil {
+			if _, err = c.readFull(packetIDBytes); err != nil {
 				log.Println("error reading var header", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "PUBREL packet: reading var header"), zap.Error(err))
 				break loop
@@ -439,7 +531,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading PUBCOMP packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading PUBCOMP packet"), zap.Error(err))
 				break loop
@@ -469,7 +561,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading SUBSCRIBE packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading SUBSCRIBE packet"), zap.Error(err))
 				break loop
@@ -519,7 +611,7 @@ loop:
 			}
 
 			remBytes := make([]byte, remLen)
-			if _, err := io.ReadFull(sockBuffer, remBytes); err != nil {
+			if _, err := c.readFull(remBytes); err != nil {
 				log.Println("error reading UNSUBSCRIBE packet", err)
 				GOTT.logger.Error("malformed", zap.String("reason", "reading UNSUBSCRIBE packet"), zap.Error(err))
 				break loop
@@ -560,22 +652,23 @@ loop:
 			c.gracefulDisconnect = true
 			break loop
 		default:
-			log.Println("UNKNOWN PACKET TYPE")
+			log.Println("UNKNOWN PACKET TYPE", packetType)
 			GOTT.logger.Error("malformed", zap.String("reason", "UNKNOWN PACKET TYPE"))
 			break loop
 		}
 
 		//log.Printf("last packet on %v", c.lastPacketReceivedOn)
 	}
+
 	c.disconnect()
 }
 
 func (c *Client) disconnect() {
-	if GOTT == nil {
+	if GOTT == nil || c.ClientID == "" {
 		return
 	}
 
-	connected := c.connected
+	connected := c.connected.Load()
 
 	c.closeConnection()
 	GOTT.removeClient(c.ClientID)
@@ -593,22 +686,35 @@ func (c *Client) disconnect() {
 				GOTT.invokeOnPublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, false)
 			}
 		}
-
 	}
 
 	if connected {
 		GOTT.invokeOnDisconnect(c.ClientID, c.Username, c.gracefulDisconnect)
-
 		GOTT.logger.Info("client disconnected", zap.String("id", c.ClientID), zap.Bool("graceful", c.gracefulDisconnect))
 	}
 }
 
 func (c *Client) closeConnection() {
-	c.connected = false
+	c.connected.Store(false)
+	if c.isWebSocket() {
+		c.wsMutex.Lock()
+		defer c.wsMutex.Unlock()
+		c.wsConnection.WriteMessage(websocket.CloseMessage, []byte{})
+		c.wsConnection.Close()
+		return
+	}
 	_ = c.connection.Close()
 }
 
 func (c *Client) emit(packet []byte) {
+	if c.isWebSocket() {
+		c.wsMutex.Lock()
+		defer c.wsMutex.Unlock()
+		if err := c.wsConnection.WriteMessage(websocket.BinaryMessage, packet); err != nil {
+			log.Println("error sending packet", err, packet)
+		}
+		return
+	}
 	if _, err := c.connection.Write(packet); err != nil {
 		log.Println("error sending packet", err, packet)
 	}

@@ -140,3 +140,4 @@ dmypy.json
 .pyre/
 
 .sessions.store
+**/_dev/
