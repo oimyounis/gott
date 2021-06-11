@@ -19,3 +19,13 @@ func IndexAllByte(b []byte, c byte) (indices []int) {
 	}
 	return
 }
+
+// StringInSlice checks whether a string is in a slice of strings.
+func StringInSlice(s string, sl []string) bool {
+	for _, o := range sl {
+		if o == s {
+			return true
+		}
+	}
+	return false
+}
