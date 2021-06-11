@@ -4,13 +4,13 @@
 [![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
 ![GitHub](https://img.shields.io/github/license/oimyounis/gott)
 
-GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as a plugin) at no cost.  
+GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
     
 **Hopefully with your contribution we could build something great!**
 
 ## Project Status
 ### In BETA
-- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement. More tests and optimizations are needed.
+- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement as more tests and optimizations are needed.
 
 ### Planned for v1 (MQTT v3.1.1)
 - [x] Ping (client -> server)
@@ -25,11 +25,11 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 - [x] Plugins
 - [x] Logging to disk (with levels and log rotation)
 - [x] TLS/SSL
+- [x] WebSockets
 
 ### Planned for v2
 - [ ] MQTT v5
-- [ ] Clustering (maybe)
-- [ ] WebSockets
+- [ ] Clustering
 
 ### Known Issues
 - Restarting the broker will reset existing subscriptions. They are not saved to disk (sessions are saved to disk but subscriptions are not restored on broker restart).
