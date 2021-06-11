@@ -1,6 +1,6 @@
 # GOTT
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/oimyounis/gott)](https://goreportcard.com/report/github.com/oimyounis/gott)
+[![Go Report Card](https://goreportcard.com/badge/github.com/oimyounis/gott?v=1)](https://goreportcard.com/report/github.com/oimyounis/gott)
 [![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
 ![GitHub](https://img.shields.io/github/license/oimyounis/gott)
 
