@@ -1,10 +1,21 @@
-# GOTT
+<p align="center">
+    <a href="https://github.com/oimyounis/gott">
+        <img src="https://raw.githubusercontent.com/oimyounis/gott/master/_github/gott-1.png" alt="GOTT Logo" height="110">
+    </a>
+</p>
+<p align="center">
+    <a href="https://goreportcard.com/report/github.com/oimyounis/gott">
+        <img src="https://goreportcard.com/badge/github.com/oimyounis/gott?v=1" alt="Go Report Card">
+    </a>
+    <a href="https://godoc.org/github.com/oimyounis/gott">
+        <img src="https://godoc.org/github.com/oimyounis/gott?status.svg" alt="GoDoc">
+    </a>
+    <a href="https://github.com/oimyounis/gott/blob/master/LICENSE">
+        <img src="https://img.shields.io/github/license/oimyounis/gott" alt="License">
+    </a>
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/oimyounis/gott?v=1)](https://goreportcard.com/report/github.com/oimyounis/gott)
-[![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
-![GitHub](https://img.shields.io/github/license/oimyounis/gott)
-
-GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
+An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
     
 **Hopefully with your contribution we could build something great!**
 
