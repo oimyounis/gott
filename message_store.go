@@ -3,13 +3,14 @@ package gott
 import (
 	"sort"
 	"sync"
+	"sync/atomic"
 )
 
 type clientMessage struct {
 	client         *Client
 	Topic, Payload []byte
 	QoS, Retain    byte
-	Status         byte
+	Status         int32
 }
 
 func (cm *clientMessage) Client() *Client {
@@ -38,9 +39,9 @@ func (ms *messageStore) store(packetID uint16, msg *clientMessage) {
 	ms.Messages[packetID] = msg
 }
 
-func (ms *messageStore) acknowledge(packetID uint16, status byte, delete bool) {
+func (ms *messageStore) acknowledge(packetID uint16, status int32, delete bool) {
 	if cm := ms.get(packetID); cm != nil {
-		cm.Status = status
+		atomic.StoreInt32(&cm.Status, status)
 
 		if delete {
 			ms.delete(packetID)

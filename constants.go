@@ -43,7 +43,7 @@ const (
 
 // Application Message statuses.
 const (
-	StatusUnacknowledged byte = iota
+	StatusUnacknowledged int32 = iota
 	StatusPubackReceived
 	StatusPubrecReceived
 	StatusPubrelReceived
@@ -59,9 +59,7 @@ const (
 # In case you wanted to enable connections over TLS only, leave this empty to
 # disable it.
 # Default is ":1883".
-
 listen: ":1883"
-
 
 # tls property defines TLS configurations.
 # To disable leave any of the child properties empty.
@@ -70,12 +68,29 @@ listen: ":1883"
   # tls.cert: Absolute path to the certificate file.
   # tls.key: Absolute path to the key file.
 # Disabled by default.
-
 tls:
   listen: ":8883"
   cert: ""
   key: ""
 
+# To disable MQTT over non-TLS WebSockets set 'listen' to an empty string.
+# To allow all Origins leave 'origins' empty.
+# If 'reject_empty_origin' is set to true, any request with a missing or empty Origin header
+# will be rejected.
+# 'wss' holds the configuration to enable WebSockets over TLS,
+  # To disable, leave any of the child properties empty.
+  # Disabled by default.
+websockets:
+  listen: ":8083"
+  path: "/ws"
+  wss:
+    listen: ":8084"
+    cert: ""
+    key: ""
+  reject_empty_origin: false
+  origins:
+    # - https://website.com
+    # - http://localhost:8000
 
 # logging property adjusts how the logger should behave.
   # logging.log_level: Defines the minimum level to which the broker should log messages,
@@ -89,20 +104,17 @@ tls:
   # logging.max_age: The number of days that the logs will live before deleted.
   # logging.enable_compression: Indicates whether to compress log files when the max_size
   # is reached or not. (highly recommended to be enabled to save disk space)
-
 logging:
   log_level: "error"
   filename: "gott.log"
-  max_size: 10 # megabytes
+  max_size: 5 # megabytes
   max_backups: 20
   max_age: 30 # days
   enable_compression: true
 
-
 # plugins property is a collection of plugin names,
 # all plugins listed here must be placed in the plugins directory to be loaded,
 # plugins are loaded by the order they were listed in.
-
 plugins:
 #  - myplugin.so
 `

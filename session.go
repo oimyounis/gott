@@ -39,7 +39,7 @@ func (s *session) storeMessage(packetID uint16, msg *clientMessage) {
 	}
 }
 
-func (s *session) acknowledge(packetID uint16, status byte, delete bool) {
+func (s *session) acknowledge(packetID uint16, status int32, delete bool) {
 	s.MessageStore.acknowledge(packetID, status, delete)
 	if !s.clean {
 		_ = s.put()

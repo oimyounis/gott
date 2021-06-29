@@ -1,6 +1,6 @@
 # GOTT Plugins
 
-**Table of content:**  
+**Table of Contents:**  
 - [Introduction](#introduction)
 - [Tutorial](#tutorial)  
   - [Implementing The Plugin](#implementing-the-plugin)
@@ -10,6 +10,7 @@
   - [The Complete Code](#the-complete-code)
 - [Documentation](#documentation)
   - [Plugin Loading](#plugin-loading)
+  - [Plugin Unloading](#plugin-unloading)
   - [Events And Hooks](#events-and-hooks)
     - [SocketOpen Event](#socketopen-event)
     - [BeforeConnect Event](#beforeconnect-event)
@@ -24,8 +25,7 @@
     - [Disconnect Event](#disconnect-event)
 
 ## Introduction
-Writing a GOTT plugin is easy yet powerful.  
-GOTT plugins are typical Go plugins that require zero dependencies. They utilize a hooking system where you hook your code to certain events such as *SocketOpen*, *Connect*, *Subscribe* and others (check out the [Events And Hooks](#events-and-hooks) section for the full list).  
+Writing a GOTT plugin is easy yet powerful; GOTT plugins are typical Go plugins that require zero dependencies. They utilize a hooking system where you hook your code to certain events such as *SocketOpen*, *Connect*, *Subscribe* and others (check out the [Events And Hooks](#events-and-hooks) section for the full list).  
 
 ## Tutorial
 We will build a simple plugin that limits subscription count per client ID.  
@@ -56,6 +56,14 @@ func newLimiter(max int) limiter {
 Lastly, we add some functions to make it work:
 
 ```go
+func (l *limiter) check(key string) bool {
+	if m, ok := l.record[key]; ok {
+		return m < l.max
+	}
+	return true
+}
+```
+```go
 func (l *limiter) increase(key string) {
 	if l.check(key) {
 	    l.record[key]++
@@ -65,14 +73,6 @@ func (l *limiter) increase(key string) {
 ```go
 func (l *limiter) decrease(key string) {
 	l.record[key]--
-}
-```
-```go
-func (l *limiter) check(key string) bool {
-	if m, ok := l.record[key]; ok {
-		return m < l.max
-	}
-	return true
 }
 ```
 
@@ -218,7 +218,19 @@ Let's say that we want to initialize some instances of some structs or maybe loa
 ```go
 func Bootstrap()
 ```
-This function counts as the main entry point of a plugin but it is not required.
+This function acts as the initialization step of a plugin, but it is not required. It will run while the Broker is starting up.  
+There is also another variation that can receive configuration set in the `config.yml` file:
+```go
+func Bootstrap(map[interface{}]interface{})
+```
+You can use either, but if both exist, the former function will be used and the latter ignored.
+
+### Plugin Unloading
+While the Broker is shutting down (either receives SIGINT or SIGTERM signals) the following function will execute, if exists: 
+```go
+func Cleanup()
+```
+You can use it to close connections, etc...
 
 ### Events And Hooks
 Following is a list of each available event and the hook to implement for it:

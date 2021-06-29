@@ -18,6 +18,14 @@ func (t tlsConfig) Enabled() bool {
 	return t.Listen != "" && t.Cert != "" && t.Key != ""
 }
 
+type wssConfig struct {
+	Listen, Cert, Key string
+}
+
+func (t wssConfig) Enabled() bool {
+	return t.Listen != "" && t.Cert != "" && t.Key != ""
+}
+
 type loggingConfig struct {
 	LogLevel          string `yaml:"log_level"`
 	Filename          string
@@ -28,22 +36,38 @@ type loggingConfig struct {
 	logLevel          zapcore.Level
 }
 
+type webSocketsConfig struct {
+	Listen            string
+	Path              string
+	RejectEmptyOrigin bool `yaml:"reject_empty_origin"`
+	Origins           []string
+	WSS               wssConfig `yaml:"wss"`
+}
+
+// Config holds the parsed config file
 type Config struct {
-	ConfigPath string
-	Listen     string
-	Tls        tlsConfig
-	Logging    loggingConfig
-	Plugins    []string
+	ConfigPath   string
+	Listen       string
+	Tls          tlsConfig
+	WebSockets   webSocketsConfig `yaml:"websockets"`
+	Logging      loggingConfig
+	Plugins      []interface{}
+	pluginNames  []string
+	pluginConfig map[string]map[interface{}]interface{}
 }
 
 func defaultConfig() Config {
 	return Config{
 		Listen: ":1883",
 		Tls:    tlsConfig{Listen: ":8883", Cert: "", Key: ""},
+		WebSockets: webSocketsConfig{
+			Listen: "",
+			Path:   "/ws",
+		},
 		Logging: loggingConfig{
 			LogLevel:          "error",
 			Filename:          "gott.log",
-			MaxSize:           10,
+			MaxSize:           5,
 			MaxBackups:        20,
 			MaxAge:            30,
 			EnableCompression: true,
@@ -79,6 +103,24 @@ func (c *Config) loadConfig() error {
 	default:
 		c.Logging.LogLevel = "error"
 		c.Logging.logLevel = zap.ErrorLevel
+	}
+
+	c.pluginConfig = make(map[string]map[interface{}]interface{})
+
+	for _, item := range c.Plugins {
+		if str, ok := item.(string); ok {
+			c.pluginNames = append(c.pluginNames, str)
+		} else if m, ok := item.(map[interface{}]interface{}); ok {
+			for k, v := range m {
+				if kstr, ok := k.(string); ok {
+					if vm, ok := v.(map[interface{}]interface{}); ok {
+						c.pluginNames = append(c.pluginNames, kstr)
+						c.pluginConfig[kstr] = vm
+					}
+				}
+				break
+			}
+		}
 	}
 
 	return nil

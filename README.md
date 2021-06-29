@@ -1,16 +1,27 @@
-# GOTT
+<p align="center">
+    <a href="https://github.com/oimyounis/gott">
+        <img src="https://raw.githubusercontent.com/oimyounis/gott/master/_github/gott-1.png" alt="GOTT Logo" height="110">
+    </a>
+</p>
+<p align="center">
+    <a href="https://goreportcard.com/report/github.com/oimyounis/gott">
+        <img src="https://goreportcard.com/badge/github.com/oimyounis/gott?v=1" alt="Go Report Card">
+    </a>
+    <a href="https://godoc.org/github.com/oimyounis/gott">
+        <img src="https://godoc.org/github.com/oimyounis/gott?status.svg" alt="GoDoc">
+    </a>
+    <a href="https://github.com/oimyounis/gott/blob/master/LICENSE">
+        <img src="https://img.shields.io/github/license/oimyounis/gott" alt="License">
+    </a>
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/oimyounis/gott)](https://goreportcard.com/report/github.com/oimyounis/gott)
-[![GoDoc](https://godoc.org/github.com/oimyounis/gott?status.svg)](https://godoc.org/github.com/oimyounis/gott)
-![GitHub](https://img.shields.io/github/license/oimyounis/gott)
-
-GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as a plugin) at no cost.  
+An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
     
 **Hopefully with your contribution we could build something great!**
 
 ## Project Status
 ### In BETA
-- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement. More tests and optimizations are needed.
+- GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement as more tests and optimizations are needed.
 
 ### Planned for v1 (MQTT v3.1.1)
 - [x] Ping (client -> server)
@@ -25,11 +36,11 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 - [x] Plugins
 - [x] Logging to disk (with levels and log rotation)
 - [x] TLS/SSL
+- [x] WebSockets
 
 ### Planned for v2
 - [ ] MQTT v5
-- [ ] Clustering (maybe)
-- [ ] WebSockets
+- [ ] Clustering
 
 ### Known Issues
 - Restarting the broker will reset existing subscriptions. They are not saved to disk (sessions are saved to disk but subscriptions are not restored on broker restart).
@@ -37,21 +48,24 @@ GOTT is a MQTT Broker written in pure Go. Aims to be a high-performance, easy-to
 ## Quick Start
 1. Install dependencies:  
 ```shell script
-$ go get -u github.com/google/uuid
-$ go get -u github.com/dgraph-io/badger
-$ go get -u github.com/json-iterator/go
-$ go get -u go.uber.org/zap
-$ go get -u gopkg.in/natefinch/lumberjack.v2
-$ go get -u gopkg.in/yaml.v2
+$ go get github.com/google/uuid
+$ go get github.com/dgraph-io/badger
+$ go get github.com/json-iterator/go
+$ go get go.uber.org/zap
+$ go get gopkg.in/natefinch/lumberjack.v2
+$ go get gopkg.in/yaml.v2
+$ go get github.com/gorilla/websocket
 ```
-2. Clone/download this repo.
+2. Clone/download this repo and place it in $GOPATH/src.
 3. Run `cd main` inside the project's directory.
-4. Run `go run main.go`.
+4. Run `go run main.go`.  
+  
+Alternatively, you can download and run the [install script](_docs/scripts/install-gott.sh) that will handle dependency installation and repo cloning for you.
 
 ## Plugins
 GOTT implements a plugin system that is very easy to work with. You can easily build your own plugin that does whatever you want.  
   
-Start by reading the [plugins documentation](_docs/plugins.md).
+Start by reading the [plugins documentation](_docs/plugins/plugins.md).
 
 ## License
 Apache License 2.0, see [LICENSE](LICENSE).
