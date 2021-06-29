@@ -58,12 +58,14 @@ $ go get github.com/gorilla/websocket
 ```
 2. Clone/download this repo and place it in $GOPATH/src.
 3. Run `cd main` inside the project's directory.
-4. Run `go run main.go`.
+4. Run `go run main.go`.  
+  
+Alternatively, you can download and run the [install script](_docs/scripts/install-gott.sh) that will handle dependency installation and repo cloning for you.
 
 ## Plugins
 GOTT implements a plugin system that is very easy to work with. You can easily build your own plugin that does whatever you want.  
   
-Start by reading the [plugins documentation](_docs/plugins.md).
+Start by reading the [plugins documentation](_docs/plugins/plugins.md).
 
 ## License
 Apache License 2.0, see [LICENSE](LICENSE).
