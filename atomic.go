@@ -31,6 +31,7 @@ func (s *subscriptionList) delete(index int) {
 		newSubs = append(newSubs, s.subs[index+1:]...)
 	}
 	s.subs = newSubs
+	GOTT.Stats.subscription(-1)
 }
 
 func (s *subscriptionList) Len() int {
