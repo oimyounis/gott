@@ -141,3 +141,5 @@ dmypy.json
 
 .sessions.store
 **/_dev/
+main/logs
+main/plugins
