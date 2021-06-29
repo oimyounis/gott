@@ -147,7 +147,7 @@ func (b *Broker) bootstrapPlugins() {
 
 		if h, err = p.Lookup("Cleanup"); err == nil {
 			f, ok := h.(func())
-			b.logger.Debug("plugin loader Cleanup", zap.String("name", pstring), zap.Bool("loaded", ok))
+			b.Logger.Debug("plugin loader Cleanup", zap.String("name", pstring), zap.Bool("loaded", ok))
 			if ok {
 				pluginObj.cleanup = f
 			}
