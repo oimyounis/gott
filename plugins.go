@@ -25,6 +25,7 @@ type gottPlugin struct {
 	onBeforeUnsubscribe func(clientID, username string, topic []byte) bool
 	onUnsubscribe       func(clientID, username string, topic []byte)
 	onDisconnect        func(clientID, username string, graceful bool)
+	cleanup             func()
 }
 
 func (b *Broker) bootstrapPlugins() {
@@ -34,7 +35,7 @@ func (b *Broker) bootstrapPlugins() {
 			log.Fatalln("Failed to create the plugins directory:", err)
 		}
 	}
-	for _, pstring := range b.config.Plugins {
+	for _, pstring := range b.config.pluginNames {
 		p, err := plugin.Open(path.Join(pluginDir, pstring))
 		if err != nil {
 			log.Printf("Skipping loading plugin %s: %v", pstring, err)
@@ -47,8 +48,10 @@ func (b *Broker) bootstrapPlugins() {
 		}
 
 		if bootstrap, err := p.Lookup("Bootstrap"); err == nil {
-			if b, ok := bootstrap.(func()); ok {
-				b()
+			if bootFunc, ok := bootstrap.(func()); ok {
+				bootFunc()
+			} else if bootFunc, ok := bootstrap.(func(map[interface{}]interface{})); ok {
+				bootFunc(b.config.pluginConfig[pstring])
 			}
 		}
 
@@ -142,9 +145,25 @@ func (b *Broker) bootstrapPlugins() {
 			}
 		}
 
+		if h, err = p.Lookup("Cleanup"); err == nil {
+			f, ok := h.(func())
+			b.logger.Debug("plugin loader Cleanup", zap.String("name", pstring), zap.Bool("loaded", ok))
+			if ok {
+				pluginObj.cleanup = f
+			}
+		}
+
 		b.plugins = append(b.plugins, pluginObj)
 
 		b.logger.Debug("plugin loaded", zap.String("name", pstring))
+	}
+}
+
+func (b *Broker) cleanupPlugins() {
+	for _, p := range b.plugins {
+		if p.cleanup != nil {
+			p.cleanup()
+		}
 	}
 }
 

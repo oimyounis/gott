@@ -9,9 +9,12 @@ import (
 	"log"
 	"math"
 	"net"
+	"os"
+	"os/signal"
 	"sort"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -155,7 +158,12 @@ func (b *Broker) Listen() error {
 		return errors.New("no listeners started. Non-TLS, TLS and WebSockets listeners are disabled")
 	}
 
-	select {}
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	<-sig
+	b.cleanupPlugins()
+
+	return nil
 }
 
 func (b *Broker) addClient(client *Client) {
