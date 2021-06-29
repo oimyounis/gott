@@ -134,7 +134,9 @@ loop:
 
 		_, err := c.read(fixedHeader)
 		if err != nil {
-			log.Println("fixedHeader read error", err)
+			if err != io.EOF {
+				log.Println("fixedHeader read error", err)
+			}
 			break
 		}
 
@@ -665,6 +667,7 @@ loop:
 
 func (c *Client) disconnect() {
 	if GOTT == nil || c.ClientID == "" {
+		c.closeConnection()
 		return
 	}
 

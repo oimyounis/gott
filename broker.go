@@ -83,7 +83,9 @@ func (b *Broker) Listen() error {
 		if err != nil {
 			return err
 		}
-		defer l.Close()
+		defer func(l net.Listener) {
+			_ = l.Close()
+		}(l)
 
 		b.listener = l
 		log.Println("Broker listening on " + b.listener.Addr().String())
@@ -93,7 +95,7 @@ func (b *Broker) Listen() error {
 			for {
 				conn, err := b.listener.Accept()
 				if err != nil {
-					log.Printf("Couldn't accept connection: %v\n", err)
+					//log.Printf("Couldn't accept connection: %v\n", err)
 				} else {
 					go b.handleConnection(conn)
 				}
@@ -114,7 +116,9 @@ func (b *Broker) Listen() error {
 		if err != nil {
 			return err
 		}
-		defer tl.Close()
+		defer func(tl net.Listener) {
+			_ = tl.Close()
+		}(tl)
 
 		b.tlsListener = tl
 		log.Println("Started TLS listener on " + b.tlsListener.Addr().String())
