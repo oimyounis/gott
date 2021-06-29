@@ -26,11 +26,6 @@ type topicLevel struct {
 	RetainedMessage          *message
 }
 
-func (tl *topicLevel) deleteSubscription(index int) {
-	tl.Subscriptions.Delete(index)
-	GOTT.Stats.subscription(-1)
-}
-
 func (tl *topicLevel) reverse(segs [][]byte, matches *[]*topicLevel) {
 	if len(segs) == 0 {
 		if tl.RetainedMessage != nil {
