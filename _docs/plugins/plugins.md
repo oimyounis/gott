@@ -207,7 +207,7 @@ func OnUnsubscribe(clientID, username string, topic []byte) {
 GOTT plugins are regular Go plugins that utilize a hooking system that will allow you to connect Go code to certain events.  
 *All hooks and functions are optional and must be exported.*  
   
-**Important**: event invocations are blocking calls which may reduce the Broker's performance therefore, you should execute in goroutines all the code that don't need to complete before resuming the Broker's workflow (eg. saving messages to a DB).  
+**Important**: event invocations are blocking calls which may reduce the Broker's performance therefore, you should execute in goroutines all the code that don't need to complete before resuming the Broker's workflow (e.g. saving messages to a DB).  
 It's up to you to decide whether you need goroutines or not. For example, following are situations where you wouldn't need to use goroutines:
 - Authentication
 - Connection throttling
@@ -223,7 +223,7 @@ There is also another variation that can receive configuration set in the `confi
 ```go
 func Bootstrap(map[interface{}]interface{})
 ```
-You can use either, but if both exist, the former function will be used and the latter ignored.
+You can use either or none at all.
 
 ### Plugin Unloading
 While the Broker is shutting down (either receives SIGINT or SIGTERM signals) the following function will execute, if exists: 
