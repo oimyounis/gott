@@ -44,6 +44,7 @@ func (s *subscriptionList) Add(sub *subscription) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.Subs = append(s.Subs, sub)
+	GOTT.Stats.subscription(1)
 }
 
 func (s *subscriptionList) Delete(index int) {

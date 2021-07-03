@@ -19,11 +19,11 @@ type topicLevel struct {
 	hasSingleWildcardAsChild atomicBool
 	hasMultiWildcardAsChild  atomicBool
 	parent                   *topicLevel
-	Bytes                    []byte
-	Children                 []*topicLevel
-	Subscriptions            *subscriptionList
-	QoS                      byte
-	RetainedMessage          *message
+	Bytes                    []byte            `json:"bytes"`
+	Children                 []*topicLevel     `json:"children"`
+	Subscriptions            *subscriptionList `json:"subscriptions"`
+	QoS                      byte              `json:"qos"`
+	RetainedMessage          *message          `json:"-"`
 }
 
 func (tl *topicLevel) reverse(segs [][]byte, matches *[]*topicLevel) {
@@ -73,6 +73,7 @@ func (tl *topicLevel) match(segs [][]byte, matches *[]*topicLevel) *topicLevel {
 
 func (tl *topicLevel) retain(msg *message) {
 	tl.RetainedMessage = msg
+	GOTT.Stats.retained(1)
 }
 
 func (tl *topicLevel) addChild(child *topicLevel) {
@@ -271,8 +272,8 @@ func (tl *topicLevel) String() string {
 }
 
 type topicStorage struct {
-	Filters              []*topicLevel
-	mutex                sync.Mutex
+	Filters              []*topicLevel `json:"filters"`
+	mutex                sync.RWMutex
 	hasGlobalFilter      atomicBool // has "#"
 	hasTopSingleWildcard atomicBool // has "+" as top level
 }
@@ -289,6 +290,8 @@ func (ts *topicStorage) addTopLevel(tl *topicLevel) {
 }
 
 func (ts *topicStorage) find(b []byte) *topicLevel {
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
 	for _, f := range ts.Filters {
 		if gob.Equal(f.Bytes, b) {
 			return f
@@ -342,6 +345,13 @@ func (ts *topicStorage) String() string {
 	}
 
 	return strings.Join(topics, "\n")
+}
+
+// JSON returns the whole Topic Tree in JSON form.
+func (ts *topicStorage) JSON() []byte {
+	ts.mutex.RLock()
+	defer ts.mutex.RUnlock()
+	return utils.ToJSONBytes(ts, "{ filters: [] }")
 }
 
 func (tl *topicLevel) str(topics *[]string) {
