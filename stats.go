@@ -101,13 +101,13 @@ func (s *brokerStats) JSON() []byte {
 }
 
 func (s *brokerStats) String() string {
-	return fmt.Sprintf("\u001B[2J\u001B[0;0HBroker Stats:\nMax Connected Clients: %v\nConnected Clients: %v\nSessions On Disk: %v\nReceived Messages: %v\nSent Messages: %v\nSubscriptions: %v\nBytes In: %v\nBytes Out: %v\nUptime: %v\n", s.AllTimeConnectionCount, s.ConnectedClientsCount, s.SessionsOnDiskCount, s.ReceivedMessagesCount, s.SentMessagesCount, s.SubscriptionCount, s.BytesInCount, s.BytesOutCount, s.uptime())
+	return fmt.Sprintf("Broker Stats:\nMax Connected Clients: %v\nConnected Clients: %v\nSessions On Disk: %v\nReceived Messages: %v\nSent Messages: %v\nSubscriptions: %v\nBytes In: %v\nBytes Out: %v\nUptime: %v\n", s.AllTimeConnectionCount, s.ConnectedClientsCount, s.SessionsOnDiskCount, s.ReceivedMessagesCount, s.SentMessagesCount, s.SubscriptionCount, s.BytesInCount, s.BytesOutCount, s.uptime())
 }
 
 func (s *brokerStats) StartMonitor() {
 	go func() {
 		for {
-			fmt.Printf(s.String())
+			fmt.Printf("\u001B[2J\u001B[0;0H%v", s.String())
 			time.Sleep(time.Second)
 		}
 	}()
