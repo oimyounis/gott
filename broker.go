@@ -6,16 +6,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"gott/utils"
 	"log"
 	"math"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/labstack/echo"
 
 	"go.uber.org/zap"
 )
@@ -29,18 +34,21 @@ var GOTT *Broker
 
 // Broker is the main broker struct. Should not be used directly. Use the global GOTT var instead.
 type Broker struct {
-	listener           net.Listener
-	tlsListener        net.Listener
-	wsServer           *webSocketsServer
-	clients            map[string]*Client
-	mutex              sync.RWMutex
-	config             Config
-	plugins            []gottPlugin
-	Stats              brokerStats
-	Logger             *zap.Logger
-	TopicFilterStorage *topicStorage
-	MessageStore       *messageStore
-	SessionStore       *sessionStore
+	listener             net.Listener
+	tlsListener          net.Listener
+	wsServer             *webSocketsServer
+	dashboardListener    *echo.Echo
+	dashboardTLSListener *echo.Echo
+	clients              map[string]*Client
+	mutex                sync.RWMutex
+	config               Config
+	plugins              []gottPlugin
+	Stats                brokerStats
+	Logger               *zap.Logger
+	TopicFilterStorage   *topicStorage
+	MessageStore         *messageStore
+	SessionStore         *sessionStore
+	SocketDeadLine       time.Duration
 }
 
 // NewBroker initializes a new object of type Broker. You can either use the returned pointer or the global GOTT var.
@@ -51,9 +59,10 @@ func NewBroker() (*Broker, error) {
 		clients:            map[string]*Client{},
 		config:             defaultConfig(),
 		Logger:             nil,
-		Stats:              brokerStats{started: time.Now()},
+		Stats:              brokerStats{Started: time.Now()},
 		TopicFilterStorage: &topicStorage{},
 		MessageStore:       newMessageStore(),
+		SocketDeadLine:     time.Minute * 1,
 	}
 
 	c, err := newConfig()
@@ -70,6 +79,7 @@ func NewBroker() (*Broker, error) {
 		return nil, err
 	}
 	GOTT.SessionStore = ss
+	GOTT.Stats.sessionOnDisk(ss.len())
 
 	GOTT.bootstrapPlugins()
 
@@ -127,8 +137,8 @@ func (b *Broker) Listen() error {
 		}(tl)
 
 		b.tlsListener = tl
-		log.Println("Started TLS listener on " + b.tlsListener.Addr().String())
-		b.Logger.Info("Started TLS listener on " + b.tlsListener.Addr().String())
+		log.Println("Started Broker TLS listener on " + b.tlsListener.Addr().String())
+		b.Logger.Info("Started Broker TLS listener on " + b.tlsListener.Addr().String())
 
 		go func(b *Broker) {
 			for {
@@ -157,16 +167,45 @@ func (b *Broker) Listen() error {
 		listening = true
 	}
 
-	if !listening {
-		return errors.New("no listeners started. Non-TLS, TLS and WebSockets listeners are disabled")
+	if b.config.Dashboard.Enabled() {
+		b.dashboardListener = newDashboardServer(b)
+		listening = true
+		go func() {
+			if err := b.dashboardListener.Start(b.config.Dashboard.Listen); err != http.ErrServerClosed {
+				listening = false
+				b.Logger.Fatal("Couldn't start dashboard web server", zap.Error(err))
+			}
+		}()
 	}
 
-	b.Stats.StartMonitor()
+	if b.config.Dashboard.TLS.Enabled() {
+		b.dashboardTLSListener = newDashboardServer(b)
+		listening = true
+		go func() {
+			if err := b.dashboardTLSListener.StartTLS(b.config.Dashboard.TLS.Listen, b.config.Dashboard.TLS.Cert, b.config.Dashboard.TLS.Key); err != http.ErrServerClosed {
+				listening = false
+				b.Logger.Fatal("Couldn't start dashboard TLS web server", zap.Error(err))
+			}
+		}()
+	}
+
+	select {
+	case <-time.After(time.Second):
+		break
+	}
+
+	if !listening {
+		return errors.New("no listeners started. At least one listener has to be enabled")
+	}
+
+	//b.Stats.StartMonitor()
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 	b.cleanupPlugins()
+	stopDashboardServer(b.dashboardListener)
+	stopDashboardServer(b.dashboardTLSListener)
 
 	return nil
 }
@@ -182,6 +221,7 @@ func (b *Broker) addClient(client *Client) {
 
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+	client.ConnectedAt = time.Now().Unix()
 	b.clients[client.ClientID] = client
 	b.Stats.connectedClients(1)
 }
@@ -206,6 +246,22 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		connected:  atomicBool{val: true},
 	}
 	go c.listen()
+}
+
+func (b *Broker) getClientJSON(clientID string) []byte {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return []byte("{}")
+	}
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	return utils.ToJSONBytes(b.clients[clientID], "{}")
+}
+
+func (b *Broker) getClientsJSON() []byte {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	return utils.ToJSONBytes(b.clients, "{}")
 }
 
 // Subscribe receives a client, a filter and qos level to create or update a subscription.
@@ -281,9 +337,6 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte, graceful bool) bool 
 func (b *Broker) UnsubscribeAll(c *Client, graceful bool) {
 	for _, sub := range c.Session.Subscriptions {
 		GOTT.Unsubscribe(c, sub.Filter, graceful)
-	for _, tl := range b.TopicFilterStorage.Filters {
-		tl.DeleteSubscription(client, client.gracefulDisconnect)
-		tl.traverseDeleteAll(client)
 	}
 }
 

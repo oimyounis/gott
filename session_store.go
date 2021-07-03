@@ -10,7 +10,7 @@ type sessionStore struct {
 }
 
 func loadSessionStore() (*sessionStore, error) {
-	opts := badger.DefaultOptions(".sessions.store").WithEventLogging(false)
+	opts := badger.DefaultOptions("sessions").WithEventLogging(false)
 
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -71,6 +71,18 @@ func (ss *sessionStore) delete(key string) error {
 	return ss.Update(func(txn *badger.Txn) error {
 		return txn.Delete([]byte(key))
 	})
+}
+
+func (ss *sessionStore) len() (total int64) {
+	_ = ss.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.IteratorOptions{PrefetchValues: false})
+		defer it.Close()
+		for it.Rewind(); it.Valid(); it.Next() {
+			total++
+		}
+		return nil
+	})
+	return
 }
 
 func set(txn *badger.Txn, key string, value interface{}) error {

@@ -44,12 +44,22 @@ type webSocketsConfig struct {
 	WSS               wssConfig `yaml:"wss"`
 }
 
+type dashboardConfig struct {
+	Listen string
+	TLS    tlsConfig `yaml:"tls"`
+}
+
+func (d dashboardConfig) Enabled() bool {
+	return d.Listen != ""
+}
+
 // Config holds the parsed config file
 type Config struct {
 	ConfigPath   string
 	Listen       string
 	Tls          tlsConfig
 	WebSockets   webSocketsConfig `yaml:"websockets"`
+	Dashboard    dashboardConfig
 	Logging      loggingConfig
 	Plugins      []interface{}
 	pluginNames  []string
@@ -64,6 +74,7 @@ func defaultConfig() Config {
 			Listen: "",
 			Path:   "/ws",
 		},
+		Dashboard: dashboardConfig{Listen: ":18830"},
 		Logging: loggingConfig{
 			LogLevel:          "error",
 			Filename:          "gott.log",

@@ -33,10 +33,12 @@ type Client struct {
 	reader               *bufio.Reader
 	wsReader             io.Reader
 	wsMutex              sync.Mutex
-	ClientID             string
-	WillMessage          *message
-	Username, Password   string
-	Session              *session
+	ConnectedAt          int64    `json:"connected_at"`
+	ClientID             string   `json:"client_id"`
+	WillMessage          *message `json:"-"`
+	Username             string   `json:"username"`
+	Password             string   `json:"-"`
+	Session              *session `json:"session"`
 }
 
 // isWebSocket returns a bool indicating whether this Client is using Web Sockets.
@@ -127,6 +129,21 @@ loop:
 			err := c.wsNextReader()
 			if err != nil {
 				break
+			}
+
+			// disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
+			if c.ClientID == "" {
+				_ = c.wsConnection.SetReadDeadline(time.Now().Add(GOTT.SocketDeadLine))
+				_ = c.wsConnection.SetWriteDeadline(time.Now().Add(GOTT.SocketDeadLine))
+			} else {
+				_ = c.wsConnection.SetReadDeadline(time.Now().Add(time.Duration(float64(c.keepAliveSecs)*1.5) * time.Second))
+				_ = c.wsConnection.SetWriteDeadline(time.Now().Add(time.Duration(float64(c.keepAliveSecs)*1.5) * time.Second))
+			}
+		} else {
+			if c.ClientID == "" {
+				_ = c.connection.SetDeadline(time.Now().Add(GOTT.SocketDeadLine))
+			} else {
+				_ = c.connection.SetDeadline(time.Now().Add(time.Duration(float64(c.keepAliveSecs)*1.5) * time.Second))
 			}
 		}
 
@@ -676,7 +693,7 @@ loop:
 			break loop
 		default:
 			log.Println("UNKNOWN PACKET TYPE", packetType)
-			GOTT.Logger.Error("malformed", zap.String("reason", "UNKNOWN PACKET TYPE"))
+			GOTT.Logger.Error("malformed", zap.String("reason", "unknown packet type"))
 			break loop
 		}
 
@@ -738,12 +755,13 @@ func (c *Client) emit(packet []byte) {
 		if err := c.wsConnection.WriteMessage(websocket.BinaryMessage, packet); err != nil {
 			log.Println("error sending packet", err, packet)
 		}
-		return
+	} else {
+		if _, err := c.connection.Write(packet); err != nil {
+			GOTT.Logger.Error("error sending packet", zap.Error(err))
+			return
+		}
 	}
-	if _, err := c.connection.Write(packet); err != nil {
-		GOTT.Logger.Error("error sending packet", zap.Error(err))
-		return
-	}
+
 	if packet[0]>>4 == TypePublish {
 		GOTT.Stats.sent(1)
 	}

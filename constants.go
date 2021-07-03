@@ -92,6 +92,15 @@ websockets:
     # - https://website.com
     # - http://localhost:8000
 
+# To disable the dashboard set 'listen' to an empty string.
+# To disable the dashboard over TLS set any of the child properties to an empty string.
+dashboard:
+  listen: ":18883"
+  tls:
+    listen: ":18884"
+    cert: ""
+    key: ""
+
 # logging property adjusts how the logger should behave.
   # logging.log_level: Defines the minimum level to which the broker should log messages,
     # available levels are "debug", "info", "error" and "fatal",

@@ -2,7 +2,6 @@ package main
 
 import (
 	"gott"
-	"gott/dashboard"
 	"log"
 )
 
@@ -12,10 +11,7 @@ func main() {
 		panic(err)
 	}
 
-	go dashboard.Serve(broker, ":18830")
-
 	if err = broker.Listen(); err != nil {
-		dashboard.Stop()
 		log.Fatalln(err)
 	}
 }
