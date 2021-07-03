@@ -215,10 +215,10 @@ func (tl *topicLevel) createOrUpdateSubscription(client *Client, qos byte) {
 func (tl *topicLevel) DeleteSubscription(client *Client, graceful bool) (success bool) {
 	tl.Subscriptions.RangeDelete(func(i int, sub *subscription, delete func(int)) bool {
 		if sub.Session.ID == client.ClientID {
-			if graceful || client.Session.clean {
+			if graceful || client.Session.Clean {
 				delete(i)
 			} else {
-				sub.Session.client = nil
+				sub.Session.Client = nil
 			}
 			success = true
 			return false

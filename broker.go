@@ -253,7 +253,7 @@ func (b *Broker) Subscribe(client *Client, filter []byte, qos byte) bool {
 }
 
 // Unsubscribe receives a client and a filter to remove a subscription.
-func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
+func (b *Broker) Unsubscribe(client *Client, filter []byte, graceful bool) bool {
 	if !validFilter(filter) {
 		return false
 	}
@@ -267,7 +267,7 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
 
 	if tl := b.TopicFilterStorage.find(segs[0]); tl != nil {
 		if segsLen == 1 {
-			return tl.DeleteSubscription(client, true)
+			return tl.DeleteSubscription(client, graceful)
 		}
 
 		return tl.traverseDelete(client, segs[1:])
@@ -278,9 +278,9 @@ func (b *Broker) Unsubscribe(client *Client, filter []byte) bool {
 
 // UnsubscribeAll is used to remove all subscriptions of a client.
 // Currently used when the Client disconnects.
-func (b *Broker) UnsubscribeAll(client *Client) {
-	b.TopicFilterStorage.mutex.Lock()
-	defer b.TopicFilterStorage.mutex.Unlock()
+func (b *Broker) UnsubscribeAll(c *Client, graceful bool) {
+	for _, sub := range c.Session.Subscriptions {
+		GOTT.Unsubscribe(c, sub.Filter, graceful)
 	for _, tl := range b.TopicFilterStorage.Filters {
 		tl.DeleteSubscription(client, client.gracefulDisconnect)
 		tl.traverseDeleteAll(client)
@@ -352,18 +352,18 @@ func (b *Broker) Publish(topic, payload []byte, flags publishFlags) bool {
 					Payload: payload,
 					QoS:     qos,
 					Retain:  0,
-					client:  sub.Session.client,
+					client:  sub.Session.Client,
 					Status:  StatusUnacknowledged,
 				}
 			}
 
-			if sub.Session.client != nil && sub.Session.client.connected.Load() {
-				sub.Session.client.emit(packet)
+			if sub.Session.Client != nil && sub.Session.Client.connected.Load() {
+				sub.Session.Client.emit(packet)
 				if qos != 0 {
 					b.MessageStore.store(packetID, msg)
 					go Retry(packetID, msg)
 				}
-			} else if !sub.Session.clean {
+			} else if !sub.Session.Clean {
 				if qos != 0 {
 					sub.Session.storeMessage(packetID, msg)
 				}
@@ -381,7 +381,7 @@ func (b *Broker) PublishRetained(msg *message, sub *subscription) {
 		return
 	}
 
-	if sub.Session.client != nil && sub.Session.client.connected.Load() {
+	if sub.Session.Client != nil && sub.Session.Client.connected.Load() {
 		qosOut := byte(math.Min(float64(sub.QoS), float64(msg.QoS)))
 		packet, packetID := makePublishPacket(msg.Topic, msg.Payload, 0, qosOut, 1)
 		if qosOut != 0 {
@@ -390,14 +390,14 @@ func (b *Broker) PublishRetained(msg *message, sub *subscription) {
 				Payload: msg.Payload,
 				QoS:     qosOut,
 				Retain:  1,
-				client:  sub.Session.client,
+				client:  sub.Session.Client,
 				Status:  StatusUnacknowledged,
 			}
 			b.MessageStore.store(packetID, msg)
 
 			go Retry(packetID, msg)
 		}
-		sub.Session.client.emit(packet)
+		sub.Session.Client.emit(packet)
 	}
 }
 

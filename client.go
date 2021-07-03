@@ -341,33 +341,39 @@ loop:
 
 			c.Session = newSession(c, connFlags.CleanSession)
 
-			if connFlags.CleanSession {
-				_ = GOTT.SessionStore.delete(c.ClientID) // as per [MQTT-3.1.2-6]
-			} else if GOTT.SessionStore.exists(c.ClientID) {
-				sessionPresent = 1
-				if err := c.Session.load(); err != nil {
+			if GOTT.SessionStore.exists(c.ClientID) {
+				if err := c.Session.load(); err == nil {
+					if connFlags.CleanSession {
+						GOTT.UnsubscribeAll(c, true)
+						if err = GOTT.SessionStore.delete(c.ClientID); err == nil { // as per [MQTT-3.1.2-6]
+							GOTT.Stats.sessionOnDisk(-1)
+						}
+						c.Session = newSession(c, connFlags.CleanSession)
+					} else {
+						sessionPresent = 1
+					}
+				} else {
 					// try to delete stored session in case it was malformed
-					_ = GOTT.SessionStore.delete(c.ClientID)
+					if err = GOTT.SessionStore.delete(c.ClientID); err == nil {
+						GOTT.Stats.sessionOnDisk(-1)
+					}
 				}
-
-				//log.Printf("session for id: %s, session: %#v", c.ClientID, c.Session)
-			} else {
+			} else if !connFlags.CleanSession {
 				if err := c.Session.put(); err != nil {
 					log.Println("error putting session to store:", err)
-					GOTT.Logger.Error("malformed", zap.String("reason", "error putting session to store"),
+					GOTT.Logger.Error("session store", zap.String("reason", "error putting session to store"),
 						zap.Error(err))
 					break loop
 				}
+				GOTT.Stats.sessionOnDisk(1)
 			}
-
-			// TODO: implement keep alive check and disconnect on timeout of (1.5 * keepalive) as per spec [3.1.2.10]
 
 			// connection succeeded
 			log.Println("client connected with id:", c.ClientID)
 			GOTT.addClient(c)
 			c.emit(makeConnAckPacket(sessionPresent, ConnectAccepted))
 
-			c.Session.replay() //
+			c.Session.replay()
 
 			if !GOTT.invokeOnConnect(c.ClientID, c.Username, c.Password) {
 				break loop
@@ -593,16 +599,27 @@ loop:
 
 			// NOTE: If a Server receives a SUBSCRIBE packet that contains multiple Topic Filters it MUST handle that packet as if it had received a sequence of multiple SUBSCRIBE packets, except that it combines their responses into a single SUBACK response [MQTT-3.8.4-4].
 
+			var subAdded bool
+
 			for _, filter := range filterList {
 				if !GOTT.invokeOnBeforeSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS) {
 					continue
 				}
 
 				if GOTT.Subscribe(c, filter.Filter, filter.QoS) {
-					GOTT.Stats.subscription(1)
+					if !c.Session.Clean {
+						if c.Session.addSubscription(filter) {
+							subAdded = true
+						}
+					}
 					GOTT.invokeOnSubscribe(c.ClientID, c.Username, filter.Filter, filter.QoS)
 					GOTT.Logger.Info("subscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter.Filter), zap.Int("qos", int(filter.QoS)))
 				}
+			}
+
+			if subAdded {
+				// putting session outside of the above loop to avoid unnecessary multiple session writes
+				_ = c.Session.put()
 			}
 
 			c.emit(makeSubAckPacket(packetIDBytes, filterList))
@@ -644,7 +661,7 @@ loop:
 					continue
 				}
 
-				if GOTT.Unsubscribe(c, filter) {
+				if GOTT.Unsubscribe(c, filter, true) {
 					GOTT.invokeOnUnsubscribe(c.ClientID, c.Username, filter)
 					GOTT.Logger.Info("unsubscribe", zap.String("clientID", c.ClientID), zap.ByteString("filter", filter))
 				}
@@ -680,9 +697,9 @@ func (c *Client) disconnect() {
 	c.closeConnection()
 	GOTT.removeClient(c.ClientID)
 
-	//log.Printf("client id %s was disconnected", c.ClientID)
+	log.Printf("client id %s was disconnected", c.ClientID)
 
-	GOTT.UnsubscribeAll(c)
+	GOTT.UnsubscribeAll(c, c.gracefulDisconnect)
 
 	if c.WillMessage != nil {
 		if GOTT.invokeOnBeforePublish(c.ClientID, c.Username, c.WillMessage.Topic, c.WillMessage.Payload, 0, c.WillMessage.QoS, c.WillMessage.Retain) {

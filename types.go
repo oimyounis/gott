@@ -14,13 +14,13 @@ type publishFlags struct {
 }
 
 type filter struct {
-	Filter []byte
-	QoS    byte
+	Filter []byte `json:"filter"`
+	QoS    byte   `json:"qos"`
 }
 
 type subscription struct {
-	Session *session
-	QoS     byte
+	Session *session `json:"session"`
+	QoS     byte     `json:"qos"`
 }
 
 type message struct {
