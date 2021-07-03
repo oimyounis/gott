@@ -15,7 +15,7 @@
     </a>
 </p>
 
-An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be embedded in a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
+An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pluggable broker with most of the features that could be provided by a broker available out of the box (either embedded in the Broker itself or as plugins) at no cost.  
     
 **Hopefully with your contribution we could build something great!**
 
@@ -24,7 +24,6 @@ An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pl
 - GOTT is currently in a BETA stage. All planned features fully work as tested while developed. Still, there is room for improvement as more tests and optimizations are needed.
 
 ### Planned for v1 (MQTT v3.1.1)
-- [x] Ping (client -> server)
 - [x] Topic filtering with wildcards support
 - [x] Subscriptions
 - [x] QoS 0 messages
@@ -41,9 +40,6 @@ An MQTT Broker written in pure Go. Aims to be a high-performance, easy-to-use pl
 ### Planned for v2
 - [ ] MQTT v5
 - [ ] Clustering
-
-### Known Issues
-- Restarting the broker will reset existing subscriptions. They are not saved to disk (sessions are saved to disk but subscriptions are not restored on broker restart).
 
 ## Quick Start
 1. Install dependencies:  

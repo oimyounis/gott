@@ -1,7 +1,7 @@
 /*
-GOTT - A MQTT Broker written in pure Go
+GOTT - An MQTT Broker written in pure Go
 
-Copyright 2019 Omar Younis (The GOTT author)
+Copyright 2021 Omar Younis (The GOTT author) and contributors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
